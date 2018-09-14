@@ -139,13 +139,15 @@ def main():
 
     epochs = args.epochs
     pre_trained_word_vectors = None
+    dim = args.dim
     if args.pre_trained:
         pre_trained_word_vectors = np.zeros((len(TEXT.vocab), pre_trained_w2v.vector_size), dtype=np.float32)
         for id, word in enumerate(TEXT.vocab.itos):
             pre_trained_word_vectors[id] = pre_trained_w2v.get_vector(word)
         pre_trained_word_vectors = torch.from_numpy(pre_trained_word_vectors)
+        dim = pre_trained_w2v.vector_size
 
-    model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=args.dim,
+    model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=dim,
                                pre_trained_emb=pre_trained_word_vectors,
                                freeze=True).to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
