@@ -21,7 +21,7 @@ class SupervisedFastText(nn.Module):
             self.reset_parameters_input2hidden()
         else:
             raise ValueError("Unimplemented.")
-            # TODO: load pre-trained from word2vec format
+            # TODO: load pre-trained from word2vec formatted file
             # self.input2embeddings.from_pretrained(pre_trained_emb, freeze)
 
         self.reset_parameters_hidden2output()
@@ -39,4 +39,4 @@ class SupervisedFastText(nn.Module):
         :return: log prob for labels. shape: (1, `num_classes`)
         """
         hidden = torch.mean(self.input2embeddings(input_bags), dim=1)
-        return F.log_softmax(self.hidden2out(hidden), dim=1) # or addaptive softmax
+        return F.log_softmax(self.hidden2out(hidden), dim=1)

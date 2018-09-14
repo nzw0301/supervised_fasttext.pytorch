@@ -8,7 +8,7 @@ from .model import SupervisedFastText
 from torchtext.data import TabularDataset, BucketIterator, Field, LabelField
 
 
-def test(args, model, device, test_iter):
+def test(model, device, test_iter):
     model.eval()
     test_loss = 0.
     correct = 0
@@ -38,11 +38,11 @@ def main():
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
     parser.add_argument('--path', type=str, default='./',
-                        help='the path to the data files (default: ./)')
+                        help='path to the data files (default: ./)')
     parser.add_argument('--train', type=str, default='train.tsv',
-                        help='the file name of training data (default: train.tsv)')
+                        help='file name of training data (default: train.tsv)')
     parser.add_argument('--test', type=str, default='test.tsv',
-                        help='the fine name of test data (default: train.tsv)')
+                        help='file name of test data (default: test.tsv)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     args = parser.parse_args()
@@ -52,7 +52,7 @@ def main():
 
     device = torch.device('cuda' if use_cuda else 'cpu')
 
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+    # kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
     path = args.path
     TEXT = Field(pad_token=None, unk_token=None, batch_first=True)  # do not use padding and <unk>
@@ -81,10 +81,10 @@ def main():
     learning_rate_schedule = args.lr_update_rate
     total_num_processed_tokens_in_training = epochs * num_tokens
     num_processed_tokens = 0
-    local_processed_tokes = 0
+    local_processed_tokens = 0
 
     for epoch in range(1, epochs + 1):
-        # begin train phase
+        # begin training phase
         # NOTE: to update learning rate, I do not use `train` function
         sum_loss = 0.
         N = len(train_iter)
@@ -102,19 +102,19 @@ def main():
             sum_loss += loss.item()
 
             # update learning rate
-            local_processed_tokes += data.shape[1]
-            if local_processed_tokes > learning_rate_schedule:
-                num_processed_tokens += local_processed_tokes
-                local_processed_tokes = 0
+            local_processed_tokens += data.shape[1]
+            if local_processed_tokens > learning_rate_schedule:
+                num_processed_tokens += local_processed_tokens
+                local_processed_tokens = 0
                 progress = num_processed_tokens / total_num_processed_tokens_in_training
                 optimizer.param_groups[0]['lr'] = args.lr * (1. - progress)
         train_loss = sum_loss / N
-        # end train phase
+        # end training phase
 
-        val_loss, val_acc = test(args, model, device, test_iter)
+        val_loss, val_acc = test(model, device, test_iter)
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
-        print('Progreess: {:.7f} Average train loss: {:.4f}, Average val loss: {:.4f}, Accuracy: {:.1f}%'.format(
+        print('Progress: {:.7f} Average train loss: {:.4f}, Average val loss: {:.4f}, Accuracy: {:.1f}%'.format(
             progress, train_loss, val_loss, val_acc
         ))
 
