@@ -20,9 +20,7 @@ class SupervisedFastText(nn.Module):
         if pre_trained_emb is None:
             self.reset_parameters_input2hidden()
         else:
-            raise ValueError("Unimplemented.")
-            # TODO: load pre-trained from word2vec formatted file
-            # self.input2embeddings.from_pretrained(pre_trained_emb, freeze)
+            self.input2embeddings.from_pretrained(pre_trained_emb, freeze)
 
         self.reset_parameters_hidden2output()
 
