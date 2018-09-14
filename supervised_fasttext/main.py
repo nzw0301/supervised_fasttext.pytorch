@@ -90,9 +90,8 @@ def main():
                         help='random seed (default: 1)')
     parser.add_argument('--val', type=float, default=0.1, metavar='V',
                         help='ratio of validation data (default: 0.1)')
-    parser.add_argument('--pre-trained', type=str, default=None,
+    parser.add_argument('--pre-trained', type=str, default='',
                         help='path to word vectors formatted by word2vec\'s text (default: None)')
-
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -115,6 +114,7 @@ def main():
 
     # load embeddings
     if args.pre_trained:
+        print('Loading pre-trained word embeddings {}'.format(args.pre_trained))
         pre_trained_w2v = KeyedVectors.load_word2vec_format(fname=args.pre_trained)
         w2v_v = set(pre_trained_w2v.vocab.keys())
         TEXT.vocab = build_vocab_with_word2vec(TEXT, w2v_v, train_data)
@@ -122,11 +122,12 @@ def main():
         TEXT.build_vocab(train_data)
 
     LABEL.build_vocab(train_data)
-    if device == 'cpu':
+
+    if device.type == 'cpu':
         iterator_device = -1
     else:
         iterator_device = device
-
+    print(iterator_device)
     train_iter = Iterator(dataset=train_data, batch_size=1, device=iterator_device, train=True, shuffle=True,
                           repeat=False, sort=False)
     val_iter = Iterator(dataset=val_data, batch_size=1, device=iterator_device, train=False, shuffle=False,
@@ -137,13 +138,15 @@ def main():
     print('#train_data: {}, #val_data: {}, #test_data: {}'.format(len(train_iter), len(val_iter), len(test_iter)))
 
     epochs = args.epochs
-    pre_trained_word_vectors = np.zeros((len(TEXT.vocab), pre_trained_w2v.vector_size), dtype=np.float32)
+    pre_trained_word_vectors = None
     if args.pre_trained:
+        pre_trained_word_vectors = np.zeros((len(TEXT.vocab), pre_trained_w2v.vector_size), dtype=np.float32)
         for id, word in enumerate(TEXT.vocab.itos):
             pre_trained_word_vectors[id] = pre_trained_w2v.get_vector(word)
+        pre_trained_word_vectors = torch.from_numpy(pre_trained_word_vectors)
 
     model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=args.dim,
-                               pre_trained_emb=torch.from_numpy(pre_trained_word_vectors),
+                               pre_trained_emb=pre_trained_word_vectors,
                                freeze=True).to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
