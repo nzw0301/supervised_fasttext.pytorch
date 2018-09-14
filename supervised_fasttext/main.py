@@ -3,7 +3,7 @@ import argparse
 import torch
 from torch import optim
 import torch.nn.functional as F
-from .model import SupervisedFastText # TODO
+from .model import SupervisedFastText
 
 from torchtext.data import TabularDataset, BucketIterator, Field, LabelField
 
@@ -19,7 +19,7 @@ def test(args, model, device, test_iter):
         for batch in test_iter:
             data, target = batch.text, batch.label
             data, target = data.to(device), target.to(device)
-            output = model(torch.t(data))
+            output = model(data)
             test_loss += F.nll_loss(output, target).item()
             pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
@@ -55,7 +55,7 @@ def main():
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
     path = args.path
-    TEXT = Field(pad_token=None, unk_token=None)  # do not use padding and <unk>
+    TEXT = Field(pad_token=None, unk_token=None, batch_first=True)  # do not use padding and <unk>
     LABEL = LabelField()
 
     # TODO load val data or split val data
@@ -77,7 +77,7 @@ def main():
     num_tokens = 0
     train_iter.init_epoch()
     for batch in train_iter:
-        num_tokens += batch.text.shape[0]
+        num_tokens += batch.text.shape[1]
     learning_rate_schedule = args.lr_update_rate
     total_num_processed_tokens_in_training = epochs * num_tokens
     num_processed_tokens = 0
@@ -95,14 +95,14 @@ def main():
             data, target = batch.text, batch.label
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
-            output = model(torch.t(data))
+            output = model(data)
             loss = F.nll_loss(output, target)
             loss.backward()
             optimizer.step()
             sum_loss += loss.item()
 
             # update learning rate
-            local_processed_tokes += data.shape[0]
+            local_processed_tokes += data.shape[1]
             if local_processed_tokes > learning_rate_schedule:
                 num_processed_tokens += local_processed_tokes
                 local_processed_tokes = 0
