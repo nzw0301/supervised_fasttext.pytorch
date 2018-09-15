@@ -47,7 +47,7 @@ def build_vocab_with_word2vec(field_instance, w2v_word_set, *args, **kwargs):
 
 def test(model, device, test_iter, divide_by_num_data=True):
     model.eval()
-    test_loss = 0.
+    loss = 0.
     correct = 0
     N = len(test_iter)
     test_iter.init_epoch()
@@ -57,14 +57,14 @@ def test(model, device, test_iter, divide_by_num_data=True):
             data, target = batch.text, batch.label
             data, target = data.to(device), target.to(device)  # TODO: `.to(device)` can be removed
             output = model(data)
-            test_loss += F.nll_loss(output, target).item()
+            loss += F.nll_loss(output, target).item()
             pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     if divide_by_num_data:
-        return test_loss / N, correct / N
+        return loss / N, correct / N
     else:
-        return test_loss, correct
+        return loss, correct
 
 
 def main():
@@ -87,8 +87,8 @@ def main():
                         help='file name of training data (default: train.tsv)')
     parser.add_argument('--test', type=str, default='test.tsv',
                         help='file name of test data (default: test.tsv)')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
+    parser.add_argument('--seed', type=int, default=7, metavar='S',
+                        help='random seed (default: 7)')
     parser.add_argument('--val', type=float, default=0.1, metavar='V',
                         help='ratio of validation data (default: 0.1)')
     parser.add_argument('--pre-trained', type=str, default='',
@@ -138,8 +138,6 @@ def main():
     test_iter = Iterator(dataset=test_data, batch_size=1, device=iterator_device, train=False, shuffle=False,
                          repeat=False, sort=False)
 
-    print('#train_data: {}, #val_data: {}, #test_data: {}'.format(len(train_iter), len(val_iter), len(test_iter)))
-
     epochs = args.epochs
     pre_trained_word_vectors = None
     dim = args.dim
@@ -149,6 +147,11 @@ def main():
             pre_trained_word_vectors[id] = pre_trained_w2v.get_vector(word)
         pre_trained_word_vectors = torch.from_numpy(pre_trained_word_vectors)
         dim = pre_trained_w2v.vector_size
+
+    print('Use {}'.format(device))
+    print('#training_data: {}, #val_data: {}, #test_data: {}'.format(len(train_iter), len(val_iter), len(test_iter)),
+          end=', ')
+    print('the size of vocab in training data: {}'.format(len(TEXT.vocab)))
 
     model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=dim,
                                pre_trained_emb=pre_trained_word_vectors,
