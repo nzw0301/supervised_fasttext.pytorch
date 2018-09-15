@@ -1,3 +1,5 @@
+# Usage
+
 ```
 python -m supervised_fasttext.main -h
 usage: main.py [-h] [--dim D] [--epochs N] [--lr LR] [--lr-update-rate ulr]
@@ -25,4 +27,4 @@ optional arguments:
                         (default: ``)
   --logging-file LOGGING_FILE
                         path to logging json file (default: `result.json`)
-```                        
+```

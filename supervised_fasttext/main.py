@@ -58,7 +58,7 @@ def test(model, device, test_iter, divide_by_num_data=True):
             data, target = data.to(device), target.to(device)  # TODO: `.to(device)` can be removed
             output = model(data)
             loss += F.nll_loss(output, target).item()
-            pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
+            pred = output.argmax(1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     if divide_by_num_data:
