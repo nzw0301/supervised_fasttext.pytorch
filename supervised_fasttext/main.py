@@ -1,6 +1,7 @@
 import argparse
 import random
 import numpy as np
+import json
 from collections import Counter, OrderedDict
 from gensim.models import KeyedVectors
 
@@ -61,7 +62,7 @@ def test(model, device, test_iter, divide_by_num_data=True):
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     if divide_by_num_data:
-        return test_loss / N, 100. * correct / N
+        return test_loss / N, correct / N
     else:
         return test_loss, correct
 
@@ -91,7 +92,9 @@ def main():
     parser.add_argument('--val', type=float, default=0.1, metavar='V',
                         help='ratio of validation data (default: 0.1)')
     parser.add_argument('--pre-trained', type=str, default='',
-                        help='path to word vectors formatted by word2vec\'s text (default: None)')
+                        help='path to word vectors formatted by word2vec\'s text (default: `''`)')
+    parser.add_argument('--logging-file', type=str, default='result.json',
+                        help='path to logging json file (default: `result.json`)')
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -127,7 +130,7 @@ def main():
         iterator_device = -1
     else:
         iterator_device = device
-    print(iterator_device)
+
     train_iter = Iterator(dataset=train_data, batch_size=1, device=iterator_device, train=True, shuffle=True,
                           repeat=False, sort=False)
     val_iter = Iterator(dataset=val_data, batch_size=1, device=iterator_device, train=False, shuffle=False,
@@ -163,6 +166,14 @@ def main():
     num_processed_tokens = 0
     local_processed_tokens = 0
     N = len(train_iter)
+    learning_history = {
+        'train_loss': [],
+        'val_loss': [],
+        'val_acc': [],
+        'test_loss': [],
+        'test_acc': [],
+    }
+
     for epoch in range(1, epochs + 1):
         # begin training phase
         train_iter.init_epoch()
@@ -189,22 +200,32 @@ def main():
         train_loss = sum_loss / N
         # end training phase
 
+        # validation
         val_loss, val_acc = test(model, device, val_iter)
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
         print('Progress: {:.7f} Average train loss: {:.4f}, Average val loss: {:.4f}, Accuracy: {:.1f}%'.format(
-            progress, train_loss, val_loss, val_acc
+            progress, train_loss, val_loss, val_acc*100
         ))
 
-    N = len(test_iter)
-    test_loss, num_correct = test(model, device, test_iter, divide_by_num_data=False)
-    test_loss /= N
-    print('Average test loss: {:.4f}, Accuracy: {}/{} {:.1f}%'.format(
-        test_loss,
-        num_correct,
-        N,
-        num_correct/N
+        # test
+        test_loss, test_acc = test(model, device, test_iter)
+
+        # save this epoch
+        learning_history['train_loss'].append(train_loss)
+        learning_history['val_loss'].append(val_loss)
+        learning_history['val_acc'].append(val_acc)
+        learning_history['test_loss'].append(test_loss)
+        learning_history['test_acc'].append(test_acc)
+
+    print('Average test loss: {:.4f}, Accuracy: {:.1f}%'.format(
+        learning_history['test_loss'][-1],
+        learning_history['test_acc'][-1]*100
     ))
+
+    # logging_file
+    with open(args.logging_file, 'w') as log_file:
+        json.dump(learning_history, log_file)
 
 
 if __name__ == '__main__':
