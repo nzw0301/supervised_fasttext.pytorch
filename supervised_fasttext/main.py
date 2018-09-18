@@ -11,7 +11,6 @@ from torch import optim
 from torchtext.data import TabularDataset, Iterator, Field, LabelField, Dataset
 from torchtext.vocab import Vocab
 
-
 from .model import SupervisedFastText
 
 
@@ -161,7 +160,7 @@ def main():
     # parameters for update learning rate
     num_tokens = 0
     train_iter.init_epoch()
-    for i, batch in enumerate(train_iter):
+    for batch in train_iter:
         num_tokens += batch.text.shape[1]
 
     learning_rate_schedule = args.lr_update_rate
