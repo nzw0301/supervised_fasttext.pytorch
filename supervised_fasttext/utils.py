@@ -5,14 +5,6 @@ class EarlyStopping(object):
     valid_modes = ['min', 'max']
 
     def __init__(self, mode='min', min_delta=0, patience=10):
-        """
-        mode: monitored value type.
-        If you watch decrease value such as loss function, `mode` should be `min`.
-        If you watch increase value such as accuracy, `mode` should be `max`.
-
-        min_delta: 
-        patience: the number of epoch.
-        """
         if mode not in self.valid_modes:
             raise ValueError('mode {} is not supported. You must pass one of [{}] to `mode`.'.format(
                 mode, ', '.join(self.valid_modes)))
@@ -33,7 +25,7 @@ class EarlyStopping(object):
 
     def is_stopped(self, metric):
         """
-        :param metric: monitored value such as validation accuracy, validation loss.  
+        :param metric: monitored value such as validation accuracy, validation loss.
         :return: Boolean
         """
 

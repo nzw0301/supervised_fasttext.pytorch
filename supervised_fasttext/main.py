@@ -96,9 +96,9 @@ def main():
     parser.add_argument('--logging-file', type=str, default='result.json',
                         help='path to logging json file (default: `result.json`)')
     parser.add_argument('--patience', type=int, default=5,
-                        help='the number of epochs for earlystopping (default: 5')
+                        help='the number of epochs for earlystopping (default: 5)')
     parser.add_argument('--metric', type=str, default='loss',
-                        help='metric name to be monitored by earlystopping. [loss, acc] (default: loss')
+                        help='metric name to be monitored by earlystopping. [loss, acc] (default: loss)')
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -149,7 +149,7 @@ def main():
     else:
         ValueError('Invalid monitored metric error for `EarlyStopping`.')
     early_stopping = EarlyStopping(mode=mode, patience=args.patience)
-    
+
     epochs = args.epochs
     pre_trained_word_vectors = None
     dim = args.dim

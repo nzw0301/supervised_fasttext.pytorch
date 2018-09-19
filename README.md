@@ -5,7 +5,8 @@ python -m supervised_fasttext.main -h
 usage: main.py [-h] [--dim D] [--epochs N] [--lr LR] [--lr-update-rate ulr]
                [--no-cuda] [--gpu-id G] [--path PATH] [--train TRAIN]
                [--test TEST] [--seed S] [--val V] [--pre-trained PRE_TRAINED]
-               [--logging-file LOGGING_FILE]
+               [--logging-file LOGGING_FILE] [--patience PATIENCE]
+               [--metric METRIC]
 
 PyTorch supervised fastText example
 
@@ -27,4 +28,7 @@ optional arguments:
                         (default: ``)
   --logging-file LOGGING_FILE
                         path to logging json file (default: `result.json`)
+  --patience PATIENCE   the number of epochs for earlystopping (default: 5)
+  --metric METRIC       metric name to be monitored by earlystopping. [loss,
+                        acc] (default: loss)
 ```
