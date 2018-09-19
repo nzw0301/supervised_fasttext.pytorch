@@ -12,6 +12,7 @@ from torchtext.data import TabularDataset, Iterator, Field, LabelField, Dataset
 from torchtext.vocab import Vocab
 
 from .model import SupervisedFastText
+from .utils import EarlyStopping
 
 
 def build_vocab_with_word2vec(field_instance, w2v_word_set, *args, **kwargs):
@@ -94,6 +95,10 @@ def main():
                         help='path to word vectors formatted by word2vec\'s text (default: `''`)')
     parser.add_argument('--logging-file', type=str, default='result.json',
                         help='path to logging json file (default: `result.json`)')
+    parser.add_argument('--patience', type=int, default=5,
+                        help='the number of epochs for earlystopping (default: 5')
+    parser.add_argument('--metric', type=str, default='loss',
+                        help='metric name to be monitored by earlystopping. [loss, acc] (default: loss')
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -137,6 +142,14 @@ def main():
     test_iter = Iterator(dataset=test_data, batch_size=1, device=iterator_device, train=False, shuffle=False,
                          repeat=False, sort=False)
 
+    if args.metric == 'loss':
+        mode = 'min'
+    elif args.metric == 'acc':
+        mode = 'max'
+    else:
+        ValueError('Invalid monitored metric error for `EarlyStopping`.')
+    early_stopping = EarlyStopping(mode=mode, patience=args.patience)
+    
     epochs = args.epochs
     pre_trained_word_vectors = None
     dim = args.dim
@@ -172,10 +185,14 @@ def main():
         'train_loss': [],
         'val_loss': [],
         'val_acc': [],
-        'test_loss': [],
-        'test_acc': [],
+        'test_loss': 0.,
+        'test_acc': 0.
     }
 
+    test_loss_list = []
+    test_acc_list = []
+
+    is_stopped = False  # earlystopping flag
     for epoch in range(1, epochs + 1):
         # begin training phase
         train_iter.init_epoch()
@@ -206,28 +223,49 @@ def main():
         val_loss, val_acc = test(model, device, val_iter)
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
-        print('Progress: {:.7f} Average train loss: {:.4f}, Average val loss: {:.4f}, Accuracy: {:.1f}%'.format(
+        print('Progress: {:.7f} Avg. train loss: {:.4f}, Avg. val loss: {:.4f}, avl acc: {:.1f}%'.format(
             progress, train_loss, val_loss, val_acc*100
         ))
 
         # test
         test_loss, test_acc = test(model, device, test_iter)
+        test_loss_list.append(test_loss)
+        test_acc_list.append(test_acc)
 
         # save this epoch
         learning_history['train_loss'].append(train_loss)
         learning_history['val_loss'].append(val_loss)
         learning_history['val_acc'].append(val_acc)
-        learning_history['test_loss'].append(test_loss)
-        learning_history['test_acc'].append(test_acc)
 
-    print('Average test loss: {:.4f}, Accuracy: {:.1f}%'.format(
-        learning_history['test_loss'][-1],
-        learning_history['test_acc'][-1]*100
-    ))
+        # check earlystopping
+        if args.metric == 'loss':
+            is_stopped = early_stopping.is_stopped(val_loss)
+        else:
+            is_stopped = early_stopping.is_stopped(val_acc)
+
+        if is_stopped:
+            print('Earlystop!')
+            break
+
+    if is_stopped:
+        best_epoch_index = epoch - args.patience - 1
+    else:
+        best_epoch_index = -1
+
+    # store test evaluation result
+    test_loss = test_loss_list[best_epoch_index]
+    test_acc = test_acc_list[best_epoch_index]
+    learning_history['test_loss'] = test_loss
+    learning_history['test_acc'] = test_acc
 
     # logging_file
     with open(args.logging_file, 'w') as log_file:
         json.dump(learning_history, log_file)
+
+    print('Ave. test loss: {:.4f}, test acc.: {:.1f}%'.format(
+        test_loss,
+        test_acc*100
+    ))
 
 
 if __name__ == '__main__':
