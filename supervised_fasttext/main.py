@@ -183,6 +183,7 @@ def main():
     N = len(train_iter)
     learning_history = {
         'train_loss': [],
+        'train_acc': [],
         'val_loss': [],
         'val_acc': [],
         'test_loss': 0.,
@@ -197,6 +198,7 @@ def main():
         # begin training phase
         train_iter.init_epoch()
         sum_loss = 0.
+        correct = 0
         model.train()
 
         for batch_idx, batch in enumerate(train_iter):
@@ -207,6 +209,8 @@ def main():
             loss = F.nll_loss(output, target)
             loss.backward()
             optimizer.step()
+            pred = output.argmax(1, keepdim=True)
+            correct += pred.eq(target.view_as(pred)).sum().item()
             sum_loss += loss.item()
 
             # update learning rate
@@ -217,15 +221,17 @@ def main():
                 progress = num_processed_tokens / total_num_processed_tokens_in_training
                 optimizer.param_groups[0]['lr'] = args.lr * (1. - progress)
         train_loss = sum_loss / N
+        train_acc = correct / N
         # end training phase
 
         # validation
         val_loss, val_acc = test(model, device, val_iter)
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
-        print('Progress: {:.7f} Avg. train loss: {:.4f}, Avg. val loss: {:.4f}, avl acc: {:.1f}%'.format(
-            progress, train_loss, val_loss, val_acc*100
-        ))
+        print('Progress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
+              'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(progress, train_loss, train_acc * 100, val_loss,
+                                                               val_acc * 100
+                                                               ))
 
         # test
         test_loss, test_acc = test(model, device, test_iter)
@@ -234,6 +240,7 @@ def main():
 
         # save this epoch
         learning_history['train_loss'].append(train_loss)
+        learning_history['train_acc'].append(train_acc)
         learning_history['val_loss'].append(val_loss)
         learning_history['val_acc'].append(val_acc)
 
@@ -262,7 +269,7 @@ def main():
     with open(args.logging_file, 'w') as log_file:
         json.dump(learning_history, log_file)
 
-    print('Ave. test loss: {:.4f}, test acc.: {:.1f}%'.format(
+    print('Avg. test loss: {:.4f}, test acc.: {:.1f}%'.format(
         test_loss,
         test_acc*100
     ))
