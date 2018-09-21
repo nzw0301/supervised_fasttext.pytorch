@@ -14,6 +14,8 @@ from torchtext.vocab import Vocab
 from .model import SupervisedFastText
 from .utils import EarlyStopping
 
+def clean(example, vocab):
+    return [word for word in example if word in vocab]
 
 def build_vocab_with_word2vec(field_instance, w2v_word_set, *args, **kwargs):
     """
@@ -120,6 +122,7 @@ def main():
     train_data, val_data = train_data.split(split_ratio=(1.-args.val), random_state=random.getstate())
 
     # load embeddings
+    # should be remove unappearing words in train_data?
     if args.pre_trained:
         print('Loading pre-trained word embeddings {}'.format(args.pre_trained))
         pre_trained_w2v = KeyedVectors.load_word2vec_format(fname=args.pre_trained)
@@ -129,6 +132,12 @@ def main():
         TEXT.build_vocab(train_data)
 
     LABEL.build_vocab(train_data)
+
+    # Delete unknown words
+    # https://github.com/pytorch/text/issues/355#issuecomment-422047412
+    for data in [train_data, val_data, test_data]:
+        for i in range(len(data)):
+            data[i].text = clean(data[i].text, TEXT.vocab.stoi)
 
     if device.type == 'cpu':
         iterator_device = -1
