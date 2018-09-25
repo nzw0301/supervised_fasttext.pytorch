@@ -2,12 +2,12 @@ import numpy as np
 
 
 class EarlyStopping(object):
-    valid_modes = ['min', 'max']
+    _valid_modes = ['min', 'max']
 
-    def __init__(self, mode='min', min_delta=0, patience=10):
+    def __init__(self, mode='min', min_delta=0., patience=10):
         if mode not in self.valid_modes:
             raise ValueError('mode {} is not supported. You must pass one of [{}] to `mode`.'.format(
-                mode, ', '.join(self.valid_modes)))
+                mode, ', '.join(self._valid_modes)))
         if patience <= 0:
             raise ValueError('`patient` must be positive.')
 
@@ -17,10 +17,10 @@ class EarlyStopping(object):
         self.num_bad_epochs = 0
 
         if mode == 'min':
-            self._is_better = lambda a, best: a < best - min_delta
+            self._is_better = lambda a, best: a < best - self.min_delta
             self.best = np.finfo(np.float(0.)).max
         else:
-            self._is_better = lambda a, best: a > best + min_delta
+            self._is_better = lambda a, best: a > best + self.min_delta
             self.best = np.finfo(np.float(0.)).min
 
     def is_stopped(self, metric):

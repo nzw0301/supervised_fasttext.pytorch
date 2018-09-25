@@ -14,8 +14,10 @@ from torchtext.vocab import Vocab
 from .model import SupervisedFastText
 from .utils import EarlyStopping
 
+
 def clean(example, vocab):
     return [word for word in example if word in vocab]
+
 
 def build_vocab_with_word2vec(field_instance, w2v_word_set, *args, **kwargs):
     """
@@ -122,7 +124,7 @@ def main():
     train_data, val_data = train_data.split(split_ratio=(1.-args.val), random_state=random.getstate())
 
     # load embeddings
-    # should be remove unappearing words in train_data?
+    # TODO: should be remove not appearing words in train_data?
     if args.pre_trained:
         print('Loading pre-trained word embeddings {}'.format(args.pre_trained))
         pre_trained_w2v = KeyedVectors.load_word2vec_format(fname=args.pre_trained)
@@ -202,7 +204,7 @@ def main():
     test_loss_list = []
     test_acc_list = []
 
-    is_stopped = False  # earlystopping flag
+    is_stopped = False  # flag for earlystopping
     for epoch in range(1, epochs + 1):
         # begin training phase
         train_iter.init_epoch()
@@ -238,8 +240,8 @@ def main():
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
         print('Progress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
-              'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(progress, train_loss, train_acc * 100, val_loss,
-                                                               val_acc * 100
+              'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(progress, train_loss, train_acc*100, val_loss,
+                                                               val_acc*100
                                                                ))
 
         # test
