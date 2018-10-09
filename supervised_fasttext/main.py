@@ -84,7 +84,8 @@ def check_args(args):
 def main():
     parser = argparse.ArgumentParser(description='PyTorch supervised fastText example')
     parser.add_argument('--dim', type=int, default=10, metavar='D',
-                        help='number of hidden units (default: 10)')
+                        help='number of hidden units (default: 10).'
+                             'If \`--pre-trained\` is not \'\', this value is ignored.')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
