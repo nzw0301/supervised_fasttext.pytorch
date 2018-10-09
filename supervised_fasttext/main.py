@@ -72,7 +72,12 @@ def test(model, device, test_iter, divide_by_num_data=True):
 
 
 def check_args(args):
+    assert 0 < args.dim
+    assert 0 < args.epochs
+    assert 0. < args.lr
+    assert 0. < args.lr_update_rate
     assert 0. < args.val < 1.
+    assert 0 < args.patience
     assert args.metric in ['loss', 'acc']
 
 
