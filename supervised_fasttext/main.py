@@ -71,6 +71,11 @@ def test(model, device, test_iter, divide_by_num_data=True):
         return loss, correct
 
 
+def check_args(args):
+    assert 0. < args.val < 1.
+    assert args.metric in ['loss', 'acc']
+
+
 def main():
     parser = argparse.ArgumentParser(description='PyTorch supervised fastText example')
     parser.add_argument('--dim', type=int, default=10, metavar='D',
@@ -105,6 +110,8 @@ def main():
                         help='metric name to be monitored by earlystopping. [loss, acc] (default: loss)')
 
     args = parser.parse_args()
+    check_args(args)
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     torch.manual_seed(args.seed)
