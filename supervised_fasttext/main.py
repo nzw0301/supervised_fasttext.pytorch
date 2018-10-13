@@ -154,16 +154,11 @@ def main():
         for i in range(len(data)):
             data[i].text = clean(data[i].text, TEXT.vocab.stoi)
 
-    if device.type == 'cpu':
-        iterator_device = -1
-    else:
-        iterator_device = device
-
-    train_iter = Iterator(dataset=train_data, batch_size=1, device=iterator_device, train=True, shuffle=True,
+    train_iter = Iterator(dataset=train_data, batch_size=1, device=device, train=True, shuffle=True,
                           repeat=False, sort=False)
-    val_iter = Iterator(dataset=val_data, batch_size=1, device=iterator_device, train=False, shuffle=False,
+    val_iter = Iterator(dataset=val_data, batch_size=1, device=device, train=False, shuffle=False,
                         repeat=False, sort=False)
-    test_iter = Iterator(dataset=test_data, batch_size=1, device=iterator_device, train=False, shuffle=False,
+    test_iter = Iterator(dataset=test_data, batch_size=1, device=device, train=False, shuffle=False,
                          repeat=False, sort=False)
 
     if args.metric == 'loss':
