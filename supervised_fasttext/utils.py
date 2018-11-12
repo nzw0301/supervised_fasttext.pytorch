@@ -4,7 +4,12 @@ import numpy as np
 class EarlyStopping(object):
     _valid_modes = ['min', 'max']
 
-    def __init__(self, mode='min', min_delta=0., patience=10):
+    def __init__(
+            self,
+            mode='min',
+            min_delta=0.,
+            patience=10
+    ):
         if mode not in self._valid_modes:
             raise ValueError('mode {} is not supported. You must pass one of [{}] to `mode`.'.format(
                 mode, ', '.join(self._valid_modes)))

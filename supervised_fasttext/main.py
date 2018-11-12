@@ -180,8 +180,7 @@ def main():
         dim = pre_trained_w2v.vector_size
 
     print('Use {}'.format(device))
-    print('#training_data: {}, #val_data: {}, #test_data: {}'.format(len(train_iter), len(val_iter), len(test_iter)),
-          end=', ')
+    print('#training_data: {}, #val_data: {}, #test_data: {}'.format(len(train_iter), len(val_iter), len(test_iter)), end=', ')
     print('the size of vocab in training data: {}'.format(len(TEXT.vocab)))
 
     model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=dim,

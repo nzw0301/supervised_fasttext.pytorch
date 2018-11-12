@@ -4,7 +4,14 @@ from torch import nn
 
 
 class SupervisedFastText(nn.Module):
-    def __init__(self, V: int, num_classes: int, embedding_dim=10, pre_trained_emb=None, freeze=True):
+    def __init__(
+            self,
+            V: int,
+            num_classes: int,
+            embedding_dim=10,
+            pre_trained_emb=None,
+            freeze=True
+    ):
         """
         :param V: the size of set of words and n-grams
         :param num_classes: the number of classes
@@ -20,7 +27,7 @@ class SupervisedFastText(nn.Module):
         if pre_trained_emb is None:
             self.reset_parameters_input2hidden()
         else:
-            self.input2embeddings.from_pretrained(pre_trained_emb, freeze)
+            self.input2embeddings = nn.Embedding.from_pretrained(pre_trained_emb, freeze)
 
         self.reset_parameters_hidden2output()
 
@@ -31,7 +38,10 @@ class SupervisedFastText(nn.Module):
     def reset_parameters_hidden2output(self):
         self.hidden2out.weight.data.zero_()
 
-    def forward(self, input_bags: torch.Tensor):
+    def forward(
+            self,
+            input_bags: torch.Tensor
+    ):
         """
         :param input_bags: a bag-of-words. shape: (1, _)
         :return: log prob for labels. shape: (1, `num_classes`)
