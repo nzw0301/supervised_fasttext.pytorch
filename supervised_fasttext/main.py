@@ -2,6 +2,7 @@ import argparse
 import random
 import numpy as np
 import json
+import logging
 from collections import Counter, OrderedDict
 from gensim.models import KeyedVectors
 
@@ -82,6 +83,13 @@ def check_args(args):
 
 
 def main():
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.terminator = ''
+    logger.addHandler(stream_handler)
+
     parser = argparse.ArgumentParser(description='PyTorch supervised fastText example')
     parser.add_argument('--dim', type=int, default=10, metavar='D',
                         help='number of hidden units (default: 10).'
@@ -139,7 +147,7 @@ def main():
     # load embeddings
     # TODO: should be remove not appearing words in train_data?
     if args.pre_trained:
-        print('Loading pre-trained word embeddings {}'.format(args.pre_trained))
+        logger.info('Loading pre-trained word embeddings {}\n'.format(args.pre_trained))
         pre_trained_w2v = KeyedVectors.load_word2vec_format(fname=args.pre_trained)
         w2v_v = set(pre_trained_w2v.vocab.keys())
         TEXT.vocab = build_vocab_with_word2vec(TEXT, w2v_v, train_data)
@@ -174,14 +182,16 @@ def main():
     dim = args.dim
     if args.pre_trained:
         pre_trained_word_vectors = np.zeros((len(TEXT.vocab), pre_trained_w2v.vector_size), dtype=np.float32)
-        for id, word in enumerate(TEXT.vocab.itos):
-            pre_trained_word_vectors[id] = pre_trained_w2v.get_vector(word)
+        for i, word in enumerate(TEXT.vocab.itos):
+            pre_trained_word_vectors[i] = pre_trained_w2v.get_vector(word)
         pre_trained_word_vectors = torch.from_numpy(pre_trained_word_vectors)
         dim = pre_trained_w2v.vector_size
 
-    print('Use {}'.format(device))
-    print('#training_data: {}, #val_data: {}, #test_data: {}'.format(len(train_iter), len(val_iter), len(test_iter)), end=', ')
-    print('the size of vocab in training data: {}'.format(len(TEXT.vocab)))
+    logger.info('Use {}\n'.format(device))
+    logger.info('#training_data: {}, #val_data: {}, #test_data: {}\n'.format(
+        len(train_iter), len(val_iter), len(test_iter))
+    )
+    logger.info('the size of vocab in training data: {}\n'.format(len(TEXT.vocab)))
 
     model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=dim,
                                pre_trained_emb=pre_trained_word_vectors,
@@ -211,7 +221,7 @@ def main():
     test_loss_list = []
     test_acc_list = []
 
-    is_stopped = False  # flag for earlystopping
+    is_stopped = False  # flag of early stopping
     for epoch in range(1, epochs + 1):
         # begin training phase
         train_iter.init_epoch()
@@ -221,7 +231,7 @@ def main():
 
         for batch_idx, batch in enumerate(train_iter):
             data, target = batch.text, batch.label
-            data, target = data.to(device), target.to(device)  # TODO: `.to(device)` can be removed
+            data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
             loss = F.nll_loss(output, target)
@@ -246,10 +256,10 @@ def main():
         val_loss, val_acc = test(model, device, val_iter)
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
-        print('Progress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
-              'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(progress, train_loss, train_acc*100, val_loss,
-                                                               val_acc*100
-                                                               ))
+        logger.info('\rProgress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
+                    'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(progress, train_loss, train_acc*100, val_loss,
+                                                                     val_acc*100
+                                                                     ))
 
         # test
         test_loss, test_acc = test(model, device, test_iter)
@@ -262,14 +272,14 @@ def main():
         learning_history['val_loss'].append(val_loss)
         learning_history['val_acc'].append(val_acc)
 
-        # check earlystopping
+        # check early stopping
         if args.metric == 'loss':
             is_stopped = early_stopping.is_stopped(val_loss)
         else:
             is_stopped = early_stopping.is_stopped(val_acc)
 
         if is_stopped:
-            print('Earlystop!')
+            logger.info('Early stop!')
             break
 
     if is_stopped:
@@ -287,7 +297,7 @@ def main():
     with open(args.logging_file, 'w') as log_file:
         json.dump(learning_history, log_file)
 
-    print('Avg. test loss: {:.4f}, test acc.: {:.1f}%'.format(
+    logger.info('\nAvg. test loss: {:.4f}, test acc.: {:.1f}%'.format(
         test_loss,
         test_acc*100
     ))
