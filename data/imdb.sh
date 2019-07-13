@@ -23,5 +23,3 @@ do
 done
 
 rm -rf aclImdb aclImdb_v1.tar.gz
-
-
