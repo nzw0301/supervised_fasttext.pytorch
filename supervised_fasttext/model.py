@@ -16,6 +16,8 @@ class SupervisedFastText(nn.Module):
         :param V: the size of set of words and n-grams
         :param num_classes: the number of classes
         :param embedding_dim: the number of dimensions of word vector
+        :param freeze: Boolean. If it is true and `pre_trained_emb` is not None,
+            word embeddings are re-trained on the supervised data.
         """
         super(SupervisedFastText, self).__init__()
 

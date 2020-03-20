@@ -1,11 +1,11 @@
-import argparse
 import random
-import numpy as np
 import json
 import logging
 from collections import Counter, OrderedDict
-from gensim.models import KeyedVectors
 
+from gensim.models import KeyedVectors
+import hydra
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import optim
@@ -17,6 +17,12 @@ from .utils import EarlyStopping
 
 
 def clean(example, vocab):
+    """
+    TODO: write something here
+    :param example:
+    :param vocab:
+    :return:
+    """
     return [word for word in example if word in vocab]
 
 
@@ -51,6 +57,14 @@ def build_vocab_with_word2vec(field_instance, w2v_word_set, *args, **kwargs):
 
 
 def test(model, device, test_iter, divide_by_num_data=True):
+    """
+    TODO:
+    :param model:
+    :param device:
+    :param test_iter:
+    :param divide_by_num_data:
+    :return:
+    """
     model.eval()
     loss = 0.
     correct = 0
@@ -60,7 +74,7 @@ def test(model, device, test_iter, divide_by_num_data=True):
     with torch.no_grad():
         for batch in test_iter:
             data, target = batch.text, batch.label
-            data, target = data.to(device), target.to(device)  # TODO: `.to(device)` can be removed
+            data, target = data.to(device), target.to(device)
             output = model(data)
             loss += F.nll_loss(output, target).item()
             pred = output.argmax(1, keepdim=True)
@@ -72,17 +86,24 @@ def test(model, device, test_iter, divide_by_num_data=True):
         return loss, correct
 
 
-def check_args(args):
-    assert 0 < args.dim
-    assert 0 < args.epochs
-    assert 0. < args.lr
-    assert 0. < args.lr_update_rate
-    assert 0. < args.val < 1.
-    assert 0 < args.patience
-    assert args.metric in ['loss', 'acc']
+def check_conf(cfg):
+    """
+    Validate the hydra'S config parameters
+    :param cfg:
+    :return: None
+    """
+    assert 0 < cfg['parameters']['dim']
+    assert 0 < cfg['parameters']['min_count']
+    assert 0 < cfg['parameters']['epochs']
+    assert 0. < cfg['parameters']['lr']
+    assert 0. < cfg['parameters']['lr_update_rate']
+    assert 0. < cfg['parameters']['val_ratio'] < 1.
+    assert 0 < cfg['parameters']['patience']
+    assert cfg['parameters']['metric'] in ['loss', 'acc']
 
 
-def main():
+@hydra.main(config_path='../conf/config.yaml')
+def main(cfg):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     stream_handler = logging.StreamHandler()
@@ -90,65 +111,38 @@ def main():
     stream_handler.terminator = ''
     logger.addHandler(stream_handler)
 
-    parser = argparse.ArgumentParser(description='PyTorch supervised fastText example')
-    parser.add_argument('--dim', type=int, default=10, metavar='D',
-                        help='number of hidden units (default: 10).'
-                             'If \`--pre-trained\` is not \'\', this value is ignored.')
-    parser.add_argument('--epochs', type=int, default=10, metavar='N',
-                        help='number of epochs to train (default: 10)')
-    parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
-                        help='learning rate (default: 0.1)')
-    parser.add_argument('--lr-update-rate', type=int, default=100, metavar='ulr',
-                        help='change learning rate schedule (default: 100)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    parser.add_argument('--gpu-id', type=int, default=0, metavar='G',
-                        help='id of used GPU (default: 0)')
-    parser.add_argument('--path', type=str, default='./',
-                        help='path to the data files (default: ./)')
-    parser.add_argument('--train', type=str, default='train.tsv',
-                        help='file name of training data (default: train.tsv)')
-    parser.add_argument('--test', type=str, default='test.tsv',
-                        help='file name of test data (default: test.tsv)')
-    parser.add_argument('--seed', type=int, default=7, metavar='S',
-                        help='random seed (default: 7)')
-    parser.add_argument('--val', type=float, default=0.1, metavar='V',
-                        help='ratio of validation data (default: 0.1)')
-    parser.add_argument('--pre-trained', type=str, default='',
-                        help='path to word vectors formatted by word2vec\'s text (default: `''`)')
-    parser.add_argument('--logging-file', type=str, default='result.json',
-                        help='path to logging json file (default: `result.json`)')
-    parser.add_argument('--patience', type=int, default=5,
-                        help='the number of epochs for earlystopping (default: 5)')
-    parser.add_argument('--metric', type=str, default='loss',
-                        help='metric name to be monitored by earlystopping. [loss, acc] (default: loss)')
+    check_conf(cfg)
 
-    args = parser.parse_args()
-    check_args(args)
+    use_cuda = torch.cuda.is_available()
 
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
+    torch.manual_seed(cfg['parameters']['seed'])
+    random.seed(cfg['parameters']['seed'])
 
-    torch.manual_seed(args.seed)
-    random.seed(args.seed)
 
-    device = torch.device('cuda:{}'.format(args.gpu_id) if use_cuda else 'cpu')
+    device = torch.device('cuda:{}'.format(cfg['parameters']['gpu_id']) if use_cuda else 'cpu')
 
-    path = args.path
     TEXT = Field(pad_token=None, unk_token=None, batch_first=True)  # do not use padding and <unk>
     LABEL = LabelField()
 
     train_data, test_data = TabularDataset.splits(
-        path=path, train=args.train,
-        test=args.test, format='tsv',
-        fields=[('label', LABEL), ('text', TEXT)])
+        path=cfg['dataset']['path'],
+        train=cfg['dataset']['input_train_fname'],
+        test=cfg['dataset']['input_test_fname'],
+        format='tsv',
+        fields=[('label', LABEL), ('text', TEXT)]
+    )
 
-    train_data, val_data = train_data.split(split_ratio=(1.-args.val), random_state=random.getstate())
+    train_data, val_data = train_data.split(
+        split_ratio=(1. - cfg['parameters']['val_ratio']),
+        random_state=random.getstate()
+    )
 
     # load embeddings
-    # TODO: should be remove not appearing words in train_data?
-    if args.pre_trained:
-        logger.info('Loading pre-trained word embeddings {}\n'.format(args.pre_trained))
-        pre_trained_w2v = KeyedVectors.load_word2vec_format(fname=args.pre_trained)
+    # TODO: should be removed non-appearing words in `train_data`?
+    pretrained_path = cfg['parameters']['pre_trained']
+    if pretrained_path:
+        logger.info('Loading pre-trained word embeddings {}\n'.format(pretrained_path))
+        pre_trained_w2v = KeyedVectors.load_word2vec_format(fname=pretrained_path)
         w2v_v = set(pre_trained_w2v.vocab.keys())
         TEXT.vocab = build_vocab_with_word2vec(TEXT, w2v_v, train_data)
     else:
@@ -162,25 +156,28 @@ def main():
         for i in range(len(data)):
             data[i].text = clean(data[i].text, TEXT.vocab.stoi)
 
-    train_iter = Iterator(dataset=train_data, batch_size=1, device=device, train=True, shuffle=True, repeat=False,
-                          sort=False)
-    val_iter = Iterator(dataset=val_data, batch_size=1, device=device, train=False, shuffle=False, repeat=False,
-                        sort=False)
-    test_iter = Iterator(dataset=test_data, batch_size=1, device=device, train=False, shuffle=False, repeat=False,
-                         sort=False)
+    train_iter = Iterator(
+        dataset=train_data, batch_size=1, device=device, train=True, shuffle=True, repeat=False, sort=False
+    )
+    val_iter = Iterator(
+        dataset=val_data, batch_size=1, device=device, train=False, shuffle=False, repeat=False, sort=False
+    )
+    test_iter = Iterator(
+        dataset=test_data, batch_size=1, device=device, train=False, shuffle=False, repeat=False, sort=False
+    )
 
-    if args.metric == 'loss':
+    metric = cfg['parameters']['metric']
+    if metric == 'loss':
         mode = 'min'
-    elif args.metric == 'acc':
-        mode = 'max'
     else:
-        ValueError('Invalid monitored metric error for `EarlyStopping`.')
-    early_stopping = EarlyStopping(mode=mode, patience=args.patience)
+        mode = 'max'
 
-    epochs = args.epochs
+    early_stopping = EarlyStopping(mode=mode, patience=cfg['parameters']['patience'])
+
+    epochs = cfg['parameters']['epochs']
     pre_trained_word_vectors = None
-    dim = args.dim
-    if args.pre_trained:
+    dim = cfg['parameters']['dim']
+    if pretrained_path:
         pre_trained_word_vectors = np.zeros((len(TEXT.vocab), pre_trained_w2v.vector_size), dtype=np.float32)
         for i, word in enumerate(TEXT.vocab.itos):
             pre_trained_word_vectors[i] = pre_trained_w2v.get_vector(word)
@@ -193,10 +190,15 @@ def main():
     )
     logger.info('the size of vocab in training data: {}\n'.format(len(TEXT.vocab)))
 
-    model = SupervisedFastText(V=len(TEXT.vocab), num_classes=len(LABEL.vocab), embedding_dim=dim,
-                               pre_trained_emb=pre_trained_word_vectors,
-                               freeze=True).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    model = SupervisedFastText(
+        V=len(TEXT.vocab),
+        num_classes=len(LABEL.vocab),
+        embedding_dim=dim,
+        pre_trained_emb=pre_trained_word_vectors,
+        freeze=True
+    ).to(device)
+
+    optimizer = optim.SGD(model.parameters(), lr=cfg['parameters']['lr'])
 
     # parameters for update learning rate
     num_tokens = 0
@@ -204,11 +206,12 @@ def main():
     for batch in train_iter:
         num_tokens += batch.text.shape[1]
 
-    learning_rate_schedule = args.lr_update_rate
+    learning_rate_schedule = cfg['parameters']['lr_update_rate']
     total_num_processed_tokens_in_training = epochs * num_tokens
     num_processed_tokens = 0
     local_processed_tokens = 0
     N = len(train_iter)
+
     learning_history = {
         'train_loss': [],
         'train_acc': [],
@@ -247,7 +250,7 @@ def main():
                 num_processed_tokens += local_processed_tokens
                 local_processed_tokens = 0
                 progress = num_processed_tokens / total_num_processed_tokens_in_training
-                optimizer.param_groups[0]['lr'] = args.lr * (1. - progress)
+                optimizer.param_groups[0]['lr'] = cfg['parameters']['lr'] * (1. - progress)
         train_loss = sum_loss / N
         train_acc = correct / N
         # end training phase
@@ -256,10 +259,12 @@ def main():
         val_loss, val_acc = test(model, device, val_iter)
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
-        logger.info('\rProgress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
-                    'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(progress, train_loss, train_acc*100, val_loss,
-                                                                     val_acc*100
-                                                                     ))
+        logger.info(
+            '\rProgress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
+            'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(
+                progress, train_loss, train_acc * 100, val_loss, val_acc * 100
+            )
+        )
 
         # test
         test_loss, test_acc = test(model, device, test_iter)
@@ -273,7 +278,7 @@ def main():
         learning_history['val_acc'].append(val_acc)
 
         # check early stopping
-        if args.metric == 'loss':
+        if metric == 'loss':
             is_stopped = early_stopping.is_stopped(val_loss)
         else:
             is_stopped = early_stopping.is_stopped(val_acc)
@@ -283,7 +288,7 @@ def main():
             break
 
     if is_stopped:
-        best_epoch_index = epoch - args.patience - 1
+        best_epoch_index = epoch - cfg['parameters']['patience'] - 1
     else:
         best_epoch_index = -1
 
@@ -294,12 +299,12 @@ def main():
     learning_history['test_acc'] = test_acc
 
     # logging_file
-    with open(args.logging_file, 'w') as log_file:
+    with open(cfg['parameters']['logging_file'], 'w') as log_file:
         json.dump(learning_history, log_file)
 
     logger.info('\nAvg. test loss: {:.4f}, test acc.: {:.1f}%'.format(
         test_loss,
-        test_acc*100
+        test_acc * 100
     ))
 
 
