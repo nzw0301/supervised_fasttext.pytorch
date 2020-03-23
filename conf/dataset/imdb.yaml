@@ -1,4 +1,4 @@
 dataset:
-    path: ../../../data/
+    path: ../../../data/imdb/
     input_train_fname: train.tsv
     input_test_fname: test.tsv

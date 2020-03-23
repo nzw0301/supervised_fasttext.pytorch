@@ -34,14 +34,14 @@ Please check [`conf/config.yaml`](./conf/config.yaml) for the details.
 ## Demo: Binary classification on IMDb dataset
 
 ```bash
-cd data
+cd data/imdb
 sh imdb.sh
-perl wikifil.pl < train-data.txt > train-data.txt.normalized
-perl wikifil.pl < test-data.txt  > test-data.txt.normalized
+perl ../wikifil.pl < train-data.txt > train-data.txt.normalized
+perl ../wikifil.pl < test-data.txt  > test-data.txt.normalized
 paste train-label train-data.txt.normalized > train.tsv
 paste test-label test-data.txt.normalized > test.tsv
 rm test-data.txt.normalized test-label test-data.txt train-data.txt train-data.txt.normalized train-label
-cd ..
+cd ../../
 
 python -m supervised_fasttext.main
 
