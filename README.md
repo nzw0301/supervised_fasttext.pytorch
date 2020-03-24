@@ -5,6 +5,7 @@
 - `torchtext`: 0.5.0
 - `gensim`: 3.8.0
 - `numpy`: 1.18.1
+- [`tokenizer`](https://github.com/nzw0301/tokenizer)
 
 ## Usage
 
