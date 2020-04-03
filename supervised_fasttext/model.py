@@ -10,7 +10,8 @@ class SupervisedFastText(nn.Module):
             num_classes: int,
             embedding_dim=10,
             pre_trained_emb=None,
-            freeze=True
+            freeze=True,
+            pooling="mean"
     ):
         """
         :param V: the size of set of words and n-grams
@@ -22,10 +23,15 @@ class SupervisedFastText(nn.Module):
         super(SupervisedFastText, self).__init__()
 
         self.embedding_dim = embedding_dim
+        self.pooling = self._define_pooling(pooling)
         self.input2embeddings = nn.Embedding(num_embeddings=V, embedding_dim=embedding_dim, sparse=True)
 
-        self.hidden2out = nn.Linear(in_features=embedding_dim * 2, out_features=num_classes)
-        # self.hidden2out = nn.Linear(in_features=embedding_dim, out_features=num_classes)
+        if pooling == "min-max":
+            num_hidden = self.embedding_dim * 2
+        else:
+            num_hidden = self.embedding_dim
+
+        self.hidden2out = nn.Linear(in_features=num_hidden, out_features=num_classes)
 
         # https://github.com/facebookresearch/fastText/blob/25d0bb04bf43d8b674fe9ae5722ef65a0856f5d6/src/fasttext.cc#L669
         if pre_trained_emb is None:
@@ -42,6 +48,21 @@ class SupervisedFastText(nn.Module):
     def reset_parameters_hidden2output(self):
         self.hidden2out.weight.data.zero_()
 
+    @staticmethod
+    def _define_pooling(pool: str):
+        if pool == "mean":
+            return lambda x: torch.mean(x, dim=1)
+        if pool == "sum":
+            return lambda x: torch.sum(x, dim=1)
+        elif pool == "max":
+            return lambda x: torch.max(x, dim=1)[0]
+        elif pool == "min":
+            return lambda x: torch.min(x, dim=1)[0]
+        elif pool == "min-max":
+            return lambda x: torch.cat((torch.min(x, dim=1)[0], torch.max(x, dim=1)[0]), dim=1)
+        else:
+            raise ValueError("{} is not supported".format(pool))
+
     def forward(
             self,
             input_bags: torch.Tensor
@@ -52,11 +73,5 @@ class SupervisedFastText(nn.Module):
         """
 
         embeddings = self.input2embeddings(input_bags)
-        # hidden = torch.mean(embeddings, dim=1) # mean
-        # hidden = torch.sum(self.input2embeddings(input_bags), dim=1) # loss becomes nan
-        # hidden = torch.max(embeddings, dim=1)[0] # max
-        # hidden = torch.min(embeddings, dim=1)[0] # min
-        # min-max
-        hidden = torch.cat((torch.min(embeddings, dim=1)[0], torch.max(embeddings, dim=1)[0]), dim=1)
-
+        hidden = self.pooling(embeddings)
         return F.log_softmax(self.hidden2out(hidden), dim=1)
