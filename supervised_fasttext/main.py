@@ -14,6 +14,7 @@ from torchtext.vocab import Vocab
 
 from .model import SupervisedFastText
 from .utils import EarlyStopping
+# from .ngram_field import NgramField
 
 
 def clean(example, vocab):
@@ -118,10 +119,11 @@ def main(cfg):
     torch.manual_seed(cfg['parameters']['seed'])
     random.seed(cfg['parameters']['seed'])
 
-
     device = torch.device('cuda:{}'.format(cfg['parameters']['gpu_id']) if use_cuda else 'cpu')
 
     TEXT = Field(pad_token=None, unk_token=None, batch_first=True)  # do not use padding and <unk>
+    # TEXT = NgramField(ngram=1, pad_token=None, unk_token=None, batch_first=True)  # do not use padding and <unk>
+
     LABEL = LabelField()
 
     train_data, test_data = TabularDataset.splits(

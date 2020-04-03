@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 from tokenizer.vocab import Vocab
 
@@ -33,21 +34,14 @@ class SupervisedDictionary(object):
         self.replace_word = replace_word
         self.is_tokenized = False
         self.size_word_n_gram = max(size_word_n_gram, 1)
-        self.word_n_gram_min_count = max(size_word_n_gram, 1)
+        self.word_n_gram_min_count = max(word_n_gram_min_count, 1)
         self.label_separator = label_separator
         self.line_break_word = line_break_word
 
-        assert word_n_gram_min_count >= size_word_n_gram, \
-            "`word_n_gram_min_count` must be less than or equal to `min_count`."
-
         # add special words to vocab
         if self.replace_lower_freq_word and self.replace_word:
-            self.vocab.id2word.append(self.replace_word)
-            self.vocab.word2id[self.replace_word] = len(self.vocab.word2id)
-
-        if self.line_break_word:
-            self.vocab.id2word.append(self.line_break_word)
-            self.vocab.word2id[self.replace_word] = len(self.line_break_word)
+            self.word_vocab.id2word.append(self.replace_word)
+            self.word_vocab.word2id[self.replace_word] = len(self.word_vocab.word2id)
 
         # init logger
         logger = logging.getLogger(__name__)
@@ -57,7 +51,7 @@ class SupervisedDictionary(object):
         logger.addHandler(stream_handler)
         self.logger = logger
 
-    def fit(self, fname):
+    def fit(self, fname: str):
         """
         Fit on list of str.
         :param docs: List of str
@@ -68,29 +62,32 @@ class SupervisedDictionary(object):
 
         with open(fname) as f:
             for doc in f:
-                sequence, label = doc.split(self.label_separator)
+                elements = doc.split(self.label_separator)
+                if len(elements) == 1:
+                    continue
+                sequence, label = elements
 
+                sequence += " " + self.line_break_word
                 for word in sequence.split():
-                    self.vocab.add_word(word=word)
+                    self.word_vocab.add_word(word=word)
                 self.label_vocab.add_word(word=label)
 
             self._update_words()
 
-        if self.size_word_n_gram > 1:
-            with open(fname) as f:
+            if self.size_word_n_gram > 1:
+                f.seek(0)
                 for doc in f:
-                    words = (doc.split(self.label_separator)[0] + " " + self.line_break_word).split()
-                    processed_words = self._words2cleaned_words(words)
+                    sentence = doc.split(self.label_separator)[0] + " " + self.line_break_word
+                    processed_words = self._sentence2cleaned_words(sentence)
                     for t in range(len(processed_words) - self.size_word_n_gram + 1):
                         for n in range(2, self.size_word_n_gram + 1):
                             self.ngram_vocab.add_word('-'.join(processed_words[t:t + n]))
-
                 self.ngram_vocab.remove_low_freq_words(self.word_n_gram_min_count)
 
-    def _words2cleaned_words(self, words: list):
+    def _sentence2cleaned_words(self, words: list):
         processed_words = []
         for word in words.split():
-            if word not in self.word_vocab.word2id:
+            if word in self.word_vocab.word2id:
                 processed_words.append(word)
             elif self.replace_lower_freq_word:
                 processed_words.append(self.replace_word)
@@ -120,9 +117,15 @@ class SupervisedDictionary(object):
         y = []
         with open(fname) as f:
             for doc in f:
-                sequence, label = doc.split(self.label_separator)
-                words = self._words2cleaned_words(sequence + " " + self.line_break_word).split()
-                X.append(np.array(self._words2word_ids(words) + self._words2ngram_ids()))
+                elements = doc.split(self.label_separator)
+                if len(elements) == 1:
+                    continue
+                sentence, label = elements
+                sentence = sentence + " " + self.line_break_word
+                words = self._sentence2cleaned_words(sentence)
+                word_ids = np.array(self._words2word_ids(words), dtype=np.int64)
+                ngram_ids = np.array(self._words2ngram_ids(words), dtype=np.int64) + self.num_vocab
+                X.append(np.hstack((word_ids, ngram_ids)))
                 y.append(self.label_vocab.word2id[label])
 
         return X, y
@@ -132,7 +135,17 @@ class SupervisedDictionary(object):
         Update word related attributes.
         :return: None
         """
-        self.vocab.remove_low_freq_words(min_count=self.min_count)
-        self.num_vocab = len(self.vocab)
-        self.num_words = np.sum(self.vocab.id2freq)
+        self.word_vocab.remove_low_freq_words(min_count=self.min_count)
+        self.num_vocab = len(self.word_vocab)
+        self.num_words = np.sum(self.word_vocab.id2freq)
         self.is_tokenized = True
+
+    def recover_sentence_from_ids(self, word_ids: np.ndarray):
+        words = []
+        for w_id in word_ids:
+            if w_id >= self.num_vocab:
+                words.append(self.ngram_vocab.id2word[w_id-self.num_vocab])
+            else:
+                words.append(self.word_vocab.id2word[w_id])
+        return words
+

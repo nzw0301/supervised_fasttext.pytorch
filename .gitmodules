@@ -1,3 +1,0 @@
-[submodule "supervised_fasttext/tokenizer"]
-	path = supervised_fasttext/tokenizer
-	url = https://github.com/nzw0301/tokenizer

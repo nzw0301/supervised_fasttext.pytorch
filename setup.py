@@ -1,3 +1,3 @@
 from setuptools import setup, find_packages
 
-setup(name="Supervised_fastText.pytorch", packages=find_packages())
+setup(name="sup_fastText", packages=find_packages())
