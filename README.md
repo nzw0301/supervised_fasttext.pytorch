@@ -47,6 +47,9 @@ paste test-label test-data.txt.normalized > test.tsv
 rm test-data.txt.normalized test-label test-data.txt train-data.txt train-data.txt.normalized train-label
 cd ../../
 
+# train val split
+python data/train_valid_shuffle.py  --input-file data/imdb/train.tsv
+
 python -m supervised_fasttext.main
 
 Use cpu

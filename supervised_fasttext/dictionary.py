@@ -63,14 +63,14 @@ class SupervisedDictionary(object):
             self.logger.warning("Warning: this instance has already fitted.")
 
         with open(fname) as f:
-            for doc in f:
-                elements = doc.split(self.label_separator)
+            for line in f:
+                elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                 if len(elements) == 1:
+                    self.logger.warning('something wrong')
                     continue
-                sequence, label = elements
-
-                sequence += " " + self.line_break_word
-                for word in sequence.split():
+                label, sentence = elements
+                sentence += " " + self.line_break_word
+                for word in sentence.split():
                     self.word_vocab.add_word(word=word)
                 self.label_vocab.add_word(word=label)
 
@@ -78,8 +78,12 @@ class SupervisedDictionary(object):
 
             if self.size_word_n_gram > 1:
                 f.seek(0)
-                for doc in f:
-                    sentence = doc.split(self.label_separator)[0] + " " + self.line_break_word
+                for line in f:
+                    elements = line.strip().split(sep=self.label_separator, maxsplit=2)
+                    if len(elements) == 1:
+                        self.logger.warning('something wrong')
+                        continue
+                    sentence = elements[1] + " " + self.line_break_word
                     processed_words = self._sentence2cleaned_words(sentence)
                     for t in range(len(processed_words) - self.size_word_n_gram + 1):
                         for n in range(2, self.size_word_n_gram + 1):
@@ -121,11 +125,11 @@ class SupervisedDictionary(object):
         X = []
         y = []
         with open(fname) as f:
-            for doc in f:
-                elements = doc.split(self.label_separator)
+            for line in f:
+                elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                 if len(elements) == 1:
                     continue
-                sentence, label = elements
+                label, sentence = elements
                 sentence = sentence + " " + self.line_break_word
                 words = self._sentence2cleaned_words(sentence)
                 word_ids = np.array(self._words2word_ids(words), dtype=np.int64)
@@ -172,7 +176,6 @@ class SupervisedDictionary(object):
             # add OOV word
             new_id2word.append(self.word_vocab.id2word[-1])
 
-            OOV_id = self.word_vocab.word2id[self.replace_word]
             new_id2freq.append(total_freq_replaced_words)
 
             self.word_vocab.id2word = new_id2word

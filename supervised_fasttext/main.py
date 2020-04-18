@@ -53,7 +53,6 @@ def evaluation(model, device, test_iter, divide_by_num_data=True):
     loss = 0.
     correct = 0
     N = len(test_iter)
-    test_iter.init_epoch()
 
     with torch.no_grad():
         for sentence, label in test_iter:
@@ -80,7 +79,6 @@ def check_conf(cfg):
     assert 0 < cfg['parameters']['epochs']
     assert 0. < cfg['parameters']['lr']
     assert 0. < cfg['parameters']['lr_update_rate']
-    assert 0. < cfg['parameters']['val_ratio'] < 1.
     assert 0 < cfg['parameters']['patience']
     assert cfg['parameters']['metric'] in ['loss', 'acc']
     assert cfg['parameters']['initialize_oov'] in _valid_initialised_methods
@@ -124,13 +122,14 @@ def main(cfg):
         line_break_word=""
     )
 
-    dictionary.fit(cfg['dataset']['input_train_fname'])
+    dictionary.fit(cfg['dataset']['path'] + cfg['dataset']['train_fname'])
+
     if pretrained_vocab:
         dictionary.update_vocab_from_word_set(pretrained_vocab)
 
-    train_set = SentenceDataset(*dictionary.transform(cfg['dataset']['input_train_fname']), train=True)
-    val_set = SentenceDataset(*dictionary.transform(cfg['dataset']['input_valid_fname']), train=False)
-    test_set = SentenceDataset(*dictionary.transform(cfg['dataset']['input_test_fname']), train=False)
+    train_set = SentenceDataset(*dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['train_fname']), train=True)
+    val_set = SentenceDataset(*dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['val_fname']), train=False)
+    test_set = SentenceDataset(*dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['test_fname']), train=False)
 
     num_workers = 4
     train_data_loader = DataLoader(
@@ -230,7 +229,7 @@ def main(cfg):
             loss.backward()
             optimizer.step()
             pred = output.argmax(1, keepdim=True)
-            # TODO: can we optimise the following evaluatino?
+            # TODO: can we optimise the following evaluation part?
             correct += pred.eq(label.view_as(pred)).sum().item()
             sum_loss += loss.item()
 

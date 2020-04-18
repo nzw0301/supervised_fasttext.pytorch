@@ -12,15 +12,15 @@ def create_test_corpus_files(fname):
     """
     file content:
 
-    a\tlabel-a
+    label-a\ta
 
-    b b
+    label-b\tb
 
-    c c c
+    label-c\tc c c
 
     ...
 
-    f .... \tlabel-f
+    label-f\tf ....
     """
     with open(fname, "w") as f:
         for count, char in enumerate(string.ascii_lowercase[:6], start=1):
@@ -28,7 +28,7 @@ def create_test_corpus_files(fname):
             for _ in range(count):
                 words.append(char)
 
-            f.write("{}\tlabel-{}\n".format(" ".join(words), char))
+            f.write("label-{}\t{}\n".format(char, " ".join(words)))
         f.write("\n")
 
 
@@ -54,7 +54,10 @@ def tests():
             # word vocab related test
             assert len(dictionary.word_vocab) == 7  # a b c d e f </s>
             assert dictionary.size_word_vocab == 7
+            print(dictionary.word_vocab.word2freq)
+            print(dictionary.word_vocab.id2freq)
             assert dictionary.num_words == np.sum(np.arange(7)) + 6
+
             assert dictionary.size_total_vocab == 7
 
             # n-gram related test
@@ -410,4 +413,4 @@ def tests():
     tests_fit_with_ngram(fname)
 
     test_transform(fname)
-    delete_test_corpus_files(fname)
+    # delete_test_corpus_files(fname)
