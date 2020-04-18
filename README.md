@@ -10,6 +10,9 @@
 ## Usage
 
 ```bash
+# install dependencies
+$ pip install git+https://github.com/nzw0301/tokenizer
+
 $ python -m supervised_fasttext.main --cfg job
 dataset:
   input_test_fname: test.tsv

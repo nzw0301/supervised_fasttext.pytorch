@@ -5,6 +5,8 @@ import numpy as np
 
 from supervised_fasttext.dictionary import SupervisedDictionary
 
+PREDEFINED_VOCAB = {'a', 'b', 'c'}
+
 
 def create_test_corpus_files(fname):
     """
@@ -33,12 +35,12 @@ def create_test_corpus_files(fname):
 def delete_test_corpus_files(fname):
     os.remove(fname)
 
-def tests():
 
+def tests():
     def tests_fit_without_ngram(fname):
         def test_fit_without_replace_and_add_special(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=1,
                 replace_word="<UNK>",
                 size_word_n_gram=1,
@@ -51,8 +53,9 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 7  # a b c d e f </s>
-            assert dictionary.num_vocab == 7
+            assert dictionary.size_word_vocab == 7
             assert dictionary.num_words == np.sum(np.arange(7)) + 6
+            assert dictionary.size_total_vocab == 7
 
             # n-gram related test
             assert len(dictionary.ngram_vocab) == 0
@@ -62,7 +65,7 @@ def tests():
 
         def test_fit_without_replace_mincount(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=1,
@@ -75,7 +78,7 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 5  # c d e f </s>
-            assert dictionary.num_vocab == 5
+            assert dictionary.size_word_vocab == 5
             assert dictionary.num_words == np.sum(np.arange(7)) + 6 - 3
 
             # n-gram related test
@@ -86,7 +89,7 @@ def tests():
 
         def test_fit_with_replace_mincount(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=True,
+                replace_OOV_word=True,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=1,
@@ -99,8 +102,9 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 6  # <UNK> c d e f </s>
-            assert dictionary.num_vocab == 6
+            assert dictionary.size_word_vocab == 6
             assert dictionary.num_words == np.sum(np.arange(7)) + 6
+            assert dictionary.size_total_vocab == 6
 
             # n-gram related test
             assert len(dictionary.ngram_vocab) == 0
@@ -111,7 +115,7 @@ def tests():
 
         def test_fit_without_eos(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=True,
+                replace_OOV_word=True,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=1,
@@ -124,8 +128,9 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 5  # <UNK> c d e f
-            assert dictionary.num_vocab == 5
+            assert dictionary.size_word_vocab == 5
             assert dictionary.num_words == np.sum(np.arange(7))
+            assert dictionary.size_total_vocab == 5
 
             # n-gram related test
             assert len(dictionary.ngram_vocab) == 0
@@ -133,15 +138,68 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
+        def test_predefined_vocab(fname):
+            dictionary = SupervisedDictionary(
+                replace_OOV_word=False,
+                min_count=1,
+                replace_word="",
+                size_word_n_gram=1,
+                word_n_gram_min_count=1,
+                label_separator='\t',
+                line_break_word=""
+            )
+
+            dictionary.fit(fname)
+            dictionary.update_vocab_from_word_set(PREDEFINED_VOCAB)
+
+            # word vocab related test
+            assert len(dictionary.word_vocab) == 3  # a b c
+            assert dictionary.size_word_vocab == 3
+            assert dictionary.num_words == 1 + 2 + 3
+            assert dictionary.size_total_vocab == 3
+
+            # n-gram related test
+            assert len(dictionary.ngram_vocab) == 0
+
+            # label related test
+            assert len(dictionary.label_vocab) == 6
+
+            dictionary = SupervisedDictionary(
+                replace_OOV_word=True,
+                min_count=1,
+                replace_word="<UNK>",
+                size_word_n_gram=1,
+                word_n_gram_min_count=1,
+                label_separator='\t',
+                line_break_word=""
+            )
+
+            dictionary.fit(fname)
+            dictionary.update_vocab_from_word_set(PREDEFINED_VOCAB)
+
+            # word vocab related test
+            assert len(dictionary.word_vocab) == 4  # a b c <UNK>
+            assert dictionary.size_word_vocab == 4
+            assert dictionary.num_words == np.sum(np.arange(7))
+            assert dictionary.size_total_vocab == 4
+
+            # n-gram related test
+            assert len(dictionary.ngram_vocab) == 0
+
+            # label related test
+            assert len(dictionary.label_vocab) == 6
+
+
         test_fit_without_replace_and_add_special(fname)
         test_fit_without_replace_mincount(fname)
         test_fit_with_replace_mincount(fname)
         test_fit_without_eos(fname)
+        test_predefined_vocab(fname)
 
     def tests_fit_with_ngram(fname):
         def test_fit_without_replacement(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=1,
                 replace_word="<UNK>",
                 size_word_n_gram=2,
@@ -154,7 +212,7 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 6  # a b c d e f
-            assert dictionary.num_vocab == 6
+            assert dictionary.size_word_vocab == 6
             assert dictionary.num_words == np.sum(np.arange(7))
 
             # n-gram related test
@@ -164,9 +222,11 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
+            assert dictionary.size_total_vocab == 11
+
         def test_fit_without_replacement_with_mincount(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=1,
                 replace_word="<UNK>",
                 size_word_n_gram=2,
@@ -179,7 +239,7 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 6  # a b c d e f
-            assert dictionary.num_vocab == 6
+            assert dictionary.size_word_vocab == 6
             assert dictionary.num_words == np.sum(np.arange(7))
 
             # n-gram related test
@@ -189,9 +249,11 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
+            assert dictionary.size_total_vocab == 10
+
         def test_fit_without_replace_mincount(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=2,
@@ -204,7 +266,7 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 4  # c d e f
-            assert dictionary.num_vocab == 4
+            assert dictionary.size_word_vocab == 4
             assert dictionary.num_words == np.sum(np.arange(7)) - 3
 
             # n-gram related test
@@ -214,9 +276,11 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
+            assert dictionary.size_total_vocab == 8
+
         def test_fit_without_replace_mincount_min_count_ngram(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=3,
                 replace_word="",
                 size_word_n_gram=2,
@@ -229,7 +293,7 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 4  # c d e f
-            assert dictionary.num_vocab == 4
+            assert dictionary.size_word_vocab == 4
             assert dictionary.num_words == np.sum(np.arange(7)) - 3
 
             # n-gram related test
@@ -239,9 +303,11 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
+            assert dictionary.size_total_vocab == 7
+
         def test_fit_with_replace_mincount_min_count_ngram(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=True,
+                replace_OOV_word=True,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=2,
@@ -254,7 +320,7 @@ def tests():
 
             # word vocab related test
             assert len(dictionary.word_vocab) == 5  # c d e f <UNK>
-            assert dictionary.num_vocab == 5
+            assert dictionary.size_word_vocab == 5
             assert dictionary.num_words == np.sum(np.arange(7))
 
             # n-gram related test
@@ -263,6 +329,8 @@ def tests():
 
             # label related test
             assert len(dictionary.label_vocab) == 6
+
+            assert dictionary.size_total_vocab == 10
 
         test_fit_without_replacement(fname)
         test_fit_without_replacement_with_mincount(fname)
@@ -273,7 +341,7 @@ def tests():
     def test_transform(fname):
         def test_without_ngram(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=False,
+                replace_OOV_word=False,
                 min_count=2,
                 replace_word="",
                 size_word_n_gram=1,
@@ -292,7 +360,7 @@ def tests():
 
         def test_with_ngram(fname):
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=True,
+                replace_OOV_word=True,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=2,
@@ -312,7 +380,7 @@ def tests():
 
 
             dictionary = SupervisedDictionary(
-                replace_lower_freq_word=True,
+                replace_OOV_word=True,
                 min_count=3,
                 replace_word="<UNK>",
                 size_word_n_gram=2,

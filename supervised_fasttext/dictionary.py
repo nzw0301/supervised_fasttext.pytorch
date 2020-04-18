@@ -8,28 +8,30 @@ class SupervisedDictionary(object):
 
     def __init__(
             self,
-            replace_lower_freq_word=False,
+            replace_OOV_word=False,
             min_count=5,
             replace_word="<UNK>",
             size_word_n_gram=1,
             word_n_gram_min_count=1,
             label_separator='\t',
-            line_break_word="</s>"
+            line_break_word="</s>",
     ):
         """
-        :param replace_lower_freq_word: boolean. Whether replace lower frequency and OOV word with `replace_word`.
+        :param replace_OOV_word: boolean. Whether replace OOV words with `replace_word`.
             If False, these words removed from sequences.
         :param min_count: Threshold of word frequency.
         :param replace_word: str. Replacing word for OOV word.
         :param size_word_n_gram:
         :param word_n_gram_min_count:
         """
-        self.word_vocab = Vocab(replace_lower_freq_word, replace_word)
+        self.word_vocab = Vocab(replace_OOV_word, replace_word)
         self.ngram_vocab = Vocab(False, None)
         self.label_vocab = Vocab(False, None)
         self.num_words = 0
-        self.num_vocab = 0
-        self.replace_lower_freq_word = replace_lower_freq_word
+        self.size_word_vocab = 0
+        self.size_ngram_vocab = 0
+        self.size_total_vocab = 0
+        self.replace_OOV_word = replace_OOV_word
         self.min_count = max(min_count, 1)
         self.replace_word = replace_word
         self.is_tokenized = False
@@ -39,7 +41,7 @@ class SupervisedDictionary(object):
         self.line_break_word = line_break_word
 
         # add special words to vocab
-        if self.replace_lower_freq_word and self.replace_word:
+        if self.replace_OOV_word and self.replace_word:
             self.word_vocab.id2word.append(self.replace_word)
             self.word_vocab.word2id[self.replace_word] = len(self.word_vocab.word2id)
 
@@ -83,13 +85,16 @@ class SupervisedDictionary(object):
                         for n in range(2, self.size_word_n_gram + 1):
                             self.ngram_vocab.add_word('-'.join(processed_words[t:t + n]))
                 self.ngram_vocab.remove_low_freq_words(self.word_n_gram_min_count)
+                self.size_ngram_vocab = len(self.ngram_vocab)
+        self.size_total_vocab = self.size_word_vocab + self.size_ngram_vocab
+
 
     def _sentence2cleaned_words(self, words: list):
         processed_words = []
         for word in words.split():
             if word in self.word_vocab.word2id:
                 processed_words.append(word)
-            elif self.replace_lower_freq_word:
+            elif self.replace_OOV_word:
                 processed_words.append(self.replace_word)
         return processed_words
 
@@ -124,7 +129,7 @@ class SupervisedDictionary(object):
                 sentence = sentence + " " + self.line_break_word
                 words = self._sentence2cleaned_words(sentence)
                 word_ids = np.array(self._words2word_ids(words), dtype=np.int64)
-                ngram_ids = np.array(self._words2ngram_ids(words), dtype=np.int64) + self.num_vocab
+                ngram_ids = np.array(self._words2ngram_ids(words), dtype=np.int64) + self.size_word_vocab
                 X.append(np.hstack((word_ids, ngram_ids)))
                 y.append(self.label_vocab.word2id[label])
 
@@ -136,16 +141,53 @@ class SupervisedDictionary(object):
         :return: None
         """
         self.word_vocab.remove_low_freq_words(min_count=self.min_count)
-        self.num_vocab = len(self.word_vocab)
+        self.size_word_vocab = len(self.word_vocab)
         self.num_words = np.sum(self.word_vocab.id2freq)
         self.is_tokenized = True
 
     def recover_sentence_from_ids(self, word_ids: np.ndarray):
         words = []
         for w_id in word_ids:
-            if w_id >= self.num_vocab:
-                words.append(self.ngram_vocab.id2word[w_id-self.num_vocab])
+            if w_id >= self.size_word_vocab:
+                words.append(self.ngram_vocab.id2word[w_id - self.size_word_vocab])
             else:
                 words.append(self.word_vocab.id2word[w_id])
         return words
 
+    def update_vocab_from_word_set(self, predefined_set: set):
+        assert self.is_tokenized
+
+        if self.replace_OOV_word:
+
+            new_id2word = []
+            new_id2freq = []
+            total_freq_replaced_words = 0
+            for word in self.word_vocab.id2word:
+                if word in predefined_set:
+                    new_id2word.append(word)
+                    new_id2freq.append(self.word_vocab.word2freq[word])
+                else:
+                    total_freq_replaced_words += self.word_vocab.word2freq[word]
+
+            # add OOV word
+            new_id2word.append(self.word_vocab.id2word[-1])
+
+            OOV_id = self.word_vocab.word2id[self.replace_word]
+            new_id2freq.append(total_freq_replaced_words)
+
+            self.word_vocab.id2word = new_id2word
+            self.word_vocab.id2freq = new_id2freq
+            self.word_vocab.word2id = {word: word_id for word_id, word in enumerate(self.word_vocab.id2word)}
+            self.word2freq = {
+                self.word_vocab.id2word[word_id]: freq for word_id, freq in enumerate(self.word_vocab.id2freq)
+            }
+
+        else:
+            for word in self.word_vocab.id2word:
+                if word not in predefined_set:
+                    self.word_vocab.word2freq[word] = 0
+            self._update_words()
+
+        self.size_word_vocab = len(self.word_vocab)
+        self.num_words = np.sum(self.word_vocab.id2freq)
+        self.size_total_vocab = self.size_word_vocab + self.size_ngram_vocab
