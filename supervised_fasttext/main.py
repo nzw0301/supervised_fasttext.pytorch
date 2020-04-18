@@ -31,10 +31,12 @@ def initialise_word_embeddigns_from_pretrained_embeddings(
         upper = 1. / embeddings.vector_size
         pretrained_word_vectors = rnd.rand(-upper, upper, size=shape).astype(dtype=np.float32)
     else:
-        global_mean_vector = np.mean(np.mean(embeddings.vectors, axis=0))
+        global_mean_vector = np.mean(embeddings.vectors, axis=0)
         pretrained_word_vectors = np.tile(global_mean_vector, (dictionary.size_word_vocab, 1))
 
     for word_id, word in enumerate(dictionary.word_vocab.id2word):
+        if word == dictionary.replace_word:
+            continue
         pretrained_word_vectors[word_id] = embeddings.get_vector(word)
 
     return torch.from_numpy(pretrained_word_vectors)
@@ -42,7 +44,6 @@ def initialise_word_embeddigns_from_pretrained_embeddings(
 
 def evaluation(model, device, test_iter, divide_by_num_data=True):
     """
-    TODO:
     :param model:
     :param device:
     :param test_iter:
@@ -100,6 +101,8 @@ def main(cfg):
     random.seed(cfg['parameters']['seed'])
     rnd = np.random.RandomState(cfg['parameters']['seed'])
     OOV_initialized_method = cfg['parameters']['initialize_oov']
+    is_freeze = cfg['parameters']['freeze'] > 0
+    is_replaced_OOV = cfg['parameters']['replace_OOV'] > 0
 
     device = torch.device('cuda:{}'.format(cfg['parameters']['gpu_id']) if use_cuda else 'cpu')
 
@@ -113,9 +116,9 @@ def main(cfg):
         assert cfg['parameters']['ngram'] == 1
 
     dictionary = SupervisedDictionary(
-        replace_OOV_word=False,
+        replace_OOV_word=is_replaced_OOV,
         min_count=cfg['parameters']['min_count'],
-        replace_word="",
+        replace_word="<OOV>",
         size_word_n_gram=cfg['parameters']['ngram'],
         word_n_gram_min_count=cfg['parameters']['word_n_gram_min_count'],
         label_separator=cfg['parameters']['label_separator'],
@@ -187,7 +190,7 @@ def main(cfg):
         num_classes=len(dictionary.label_vocab),
         embedding_dim=dim,
         pre_trained_emb=pretrained_word_vectors,
-        freeze=True,
+        freeze=is_freeze,
         pooling=pooling
     ).to(device)
 

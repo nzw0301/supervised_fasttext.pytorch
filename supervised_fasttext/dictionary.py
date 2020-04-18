@@ -162,7 +162,6 @@ class SupervisedDictionary(object):
         assert self.is_tokenized
 
         if self.replace_OOV_word:
-
             new_id2word = []
             new_id2freq = []
             total_freq_replaced_words = 0
@@ -173,9 +172,8 @@ class SupervisedDictionary(object):
                 else:
                     total_freq_replaced_words += self.word_vocab.word2freq[word]
 
-            # add OOV word
-            new_id2word.append(self.word_vocab.id2word[-1])
-
+            # OOV is already skipped, so it is added again here
+            new_id2word.append(self.replace_word)
             new_id2freq.append(total_freq_replaced_words)
 
             self.word_vocab.id2word = new_id2word

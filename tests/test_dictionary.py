@@ -54,8 +54,6 @@ def tests():
             # word vocab related test
             assert len(dictionary.word_vocab) == 7  # a b c d e f </s>
             assert dictionary.size_word_vocab == 7
-            print(dictionary.word_vocab.word2freq)
-            print(dictionary.word_vocab.id2freq)
             assert dictionary.num_words == np.sum(np.arange(7)) + 6
 
             assert dictionary.size_total_vocab == 7
@@ -102,7 +100,6 @@ def tests():
             )
 
             dictionary.fit(fname)
-
             # word vocab related test
             assert len(dictionary.word_vocab) == 6  # <UNK> c d e f </s>
             assert dictionary.size_word_vocab == 6
@@ -142,6 +139,7 @@ def tests():
             assert len(dictionary.label_vocab) == 6
 
         def test_predefined_vocab(fname):
+            # min count == 1
             dictionary = SupervisedDictionary(
                 replace_OOV_word=False,
                 min_count=1,
@@ -191,6 +189,63 @@ def tests():
 
             # label related test
             assert len(dictionary.label_vocab) == 6
+
+            ## min_count == 2
+            dictionary = SupervisedDictionary(
+                replace_OOV_word=False,
+                min_count=2,
+                replace_word="",
+                size_word_n_gram=1,
+                word_n_gram_min_count=1,
+                label_separator='\t',
+                line_break_word=""
+            )
+
+            dictionary.fit(fname)
+            dictionary.update_vocab_from_word_set(PREDEFINED_VOCAB)
+
+            # word vocab related test
+            assert len(dictionary.word_vocab) == 2  # b c
+            assert dictionary.size_word_vocab == 2
+            assert dictionary.num_words == 2 + 3
+            assert dictionary.size_total_vocab == 2
+
+            # n-gram related test
+            assert len(dictionary.ngram_vocab) == 0
+
+            # label related test
+            assert len(dictionary.label_vocab) == 6
+
+            dictionary = SupervisedDictionary(
+                replace_OOV_word=True,
+                min_count=2,
+                replace_word="<UNK>",
+                size_word_n_gram=1,
+                word_n_gram_min_count=1,
+                label_separator='\t',
+                line_break_word=""
+            )
+
+            dictionary.fit(fname)
+
+            print(dictionary.word_vocab.id2word)
+            print(dictionary.word_vocab.word2id)
+            dictionary.update_vocab_from_word_set(PREDEFINED_VOCAB)
+
+            print(dictionary.word_vocab.id2word)
+            print(dictionary.word_vocab.word2id)
+            # word vocab related test
+            assert len(dictionary.word_vocab) == 3  # b c <UNK>
+            assert dictionary.size_word_vocab == 3
+            assert dictionary.num_words == np.sum(np.arange(7))
+            assert dictionary.size_total_vocab == 3
+
+            # n-gram related test
+            assert len(dictionary.ngram_vocab) == 0
+
+            # label related test
+            assert len(dictionary.label_vocab) == 6
+
 
 
         test_fit_without_replace_and_add_special(fname)
