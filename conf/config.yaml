@@ -4,13 +4,19 @@ defaults:
 parameters:
     dim: 10 # the number of vector dimensions
     min_count: 5 # threshold value for lower frequency words
+    ngram: 1 # the size of n-gram
+    word_n_gram_min_count: 10 # threshold value for lower frequency word n-grams
+    label_separator: "\t"  # separator between sentence and label
     seed: 7 # random seed value for numpy and pytorch.
     gpu_id: 0 # GPU id. Default value, 0.
     metric: loss # metric name to be monitored by earlystopping. Valid values: [loss, acc]
-    pre_trained: # pre-trained word vector path. The vector format is the text version's word2vec/fastText.
+    pre_trained:  # pre-trained word vector path. The vector format is the text version's word2vec/fastText.
     epochs: 10 # the number of epochs
     lr: 0.1 # initial learning rate
     lr_update_rate: 100 # update scheduler lr
-    val_ratio: 0.1 # ratio of validation data
     logging_file: result.json # path to logging json file
     patience: 5 # the number of epochs for earlystopping
+    pooling: mean # the type of pooling over sentence such mean, max, min, and min-max
+    initialize_oov: mean  # initialization way of OOV words when pre-trained word embeddings are used. [mean, uniform]
+    freeze: 1  # freeze pre-trained word embeddings or not
+    replace_OOV: 0 # replace OOV words with <OOV> or not.

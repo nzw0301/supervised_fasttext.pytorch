@@ -10,11 +10,10 @@ class EarlyStopping(object):
             min_delta=0.,
             patience=10
     ):
-        if mode not in self._valid_modes:
-            raise ValueError('mode {} is not supported. You must pass one of [{}] to `mode`.'.format(
-                mode, ', '.join(self._valid_modes)))
-        if patience <= 0:
-            raise ValueError('`patient` must be positive.')
+        assert mode in self._valid_modes,\
+            'mode {} is not supported. You must pass one of [{}] to `mode`.'.format(mode, ', '.join(self._valid_modes))
+        assert patience > 0,\
+            '`patient` must be positive.'
 
         self.mode = mode
         self.min_delta = min_delta
@@ -28,14 +27,13 @@ class EarlyStopping(object):
             self._is_better = lambda a, best: a > best + self.min_delta
             self.best = np.finfo(np.float(0.)).min
 
-    def is_stopped(self, metric):
+    def is_stopped(self, metric: float):
         """
-        :param metric: monitored value such as validation accuracy, validation loss.
+        :param metric: Monitored value such as validation accuracy or validation loss.
         :return: Boolean
         """
 
-        if np.isnan(metric):
-            raise ValueError('The metric becomes `nan`. Stop training.')
+        assert not np.isnan(metric), 'The metric becomes `nan`. Stop training.'
 
         if self._is_better(metric, self.best):
             self.num_bad_epochs = 0
