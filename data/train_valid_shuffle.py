@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-parser = argparse.ArgumentParser(description='train validation splits')
+parser = argparse.ArgumentParser(description='Splits dataset into training and validation sets')
 parser.add_argument('-sep', type=str, default='\t', help='separator between label and sentence')
 parser.add_argument('--input-file', type=str, help='input training file.')
 parser.add_argument('--seed', type=int, default=0, help='random seed of train shuffle')
@@ -23,9 +23,12 @@ with open(input_fname) as f:
         label, sentence = l.strip().split(sep=separator)
         y.append(label)
         x.append(sentence)
+
 x = np.array(x)
 y = np.array(y)
+
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=args.val, random_state=rnd, shuffle=True, stratify=y)
+
 splits = input_fname.split('.')
 fname, file_extension = '.'.join(splits[:-1]) , splits[-1]
 

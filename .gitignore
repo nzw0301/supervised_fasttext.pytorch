@@ -2,3 +2,4 @@
 *.txt
 *.tsv
 outputs/
+fasttext/

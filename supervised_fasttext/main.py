@@ -306,7 +306,7 @@ def main(cfg):
     with open(cfg['parameters']['logging_file'], 'w') as log_file:
         json.dump(learning_history, log_file)
 
-    logger.info('\nAvg. test loss: {:.4f}, test acc.: {:.1f}%'.format(
+    logger.info('\nTest loss: {:.4f}, test acc.: {:.1f}%'.format(
         test_loss,
         test_acc * 100
     ))
