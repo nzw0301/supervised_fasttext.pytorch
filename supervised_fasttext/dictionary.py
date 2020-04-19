@@ -21,8 +21,10 @@ class SupervisedDictionary(object):
             If False, these words removed from sequences.
         :param min_count: Threshold of word frequency.
         :param replace_word: str. Replacing word for OOV word.
-        :param size_word_n_gram:
-        :param word_n_gram_min_count:
+        :param size_word_n_gram: the maximum ngram length.
+        :param word_n_gram_min_count: Threshold of n-gram frequency.
+        :param label_separator: str. Separator between label and sentence.
+        :param line_break_word: special token added into the end of sentence.
         """
         self.word_vocab = Vocab(replace_OOV_word, replace_word)
         self.ngram_vocab = Vocab(False, None)
@@ -56,7 +58,7 @@ class SupervisedDictionary(object):
     def fit(self, fname: str):
         """
         Fit on list of str.
-        :param docs: List of str
+        :param fname: str. File name. In the file, each line must be `label[SEP]Sentence`.
         :return: None
         """
         if self.is_tokenized:
@@ -93,9 +95,14 @@ class SupervisedDictionary(object):
         self.size_total_vocab = self.size_word_vocab + self.size_ngram_vocab
 
 
-    def _sentence2cleaned_words(self, words: list):
+    def _sentence2cleaned_words(self, sentence: str):
+        """
+        Convert str into list of str. Words in list do not contain OOV words.
+        :param words: Str. sentence sample.
+        :return: List of str.
+        """
         processed_words = []
-        for word in words.split():
+        for word in sentence.split():
             if word in self.word_vocab.word2id:
                 processed_words.append(word)
             elif self.replace_OOV_word:
@@ -103,21 +110,29 @@ class SupervisedDictionary(object):
         return processed_words
 
     def _words2word_ids(self, words: list):
+        """
+        :param words: list of cleaned words, which is list of str.
+        :return: list of word ids.
+        """
         return [self.word_vocab.word2id[word] for word in words]
 
     def _words2ngram_ids(self, words: str):
+        """
+        :param words: list of cleaned words, which is list of str.
+        :return: list of n-gram ids.
+        """
         ngram_ids = []
         for t in range(len(words) - self.size_word_n_gram + 1):
             for n in range(2, self.size_word_n_gram + 1):
                 ngram = '-'.join(words[t:t + n])
                 if ngram in self.ngram_vocab.word2id:
-                    ngram_ids.append(self.ngram_vocab.word2id[ngram])
+                    ngram_ids.append(self.ngram_vocab.word2id[ngram] + self.size_word_vocab)
         return ngram_ids
 
     def transform(self, fname: str):
         """
-        :param fname:
-        :return:
+        :param fname: str. File name.
+        :return: tuple of two lists. Lists are sentences and labels respectively.
         """
         if not self.is_tokenized:
             raise Exception("This dictionary instance has not tokenized yet.")
@@ -133,7 +148,7 @@ class SupervisedDictionary(object):
                 sentence = sentence + " " + self.line_break_word
                 words = self._sentence2cleaned_words(sentence)
                 word_ids = np.array(self._words2word_ids(words), dtype=np.int64)
-                ngram_ids = np.array(self._words2ngram_ids(words), dtype=np.int64) + self.size_word_vocab
+                ngram_ids = np.array(self._words2ngram_ids(words), dtype=np.int64)
                 X.append(np.hstack((word_ids, ngram_ids)))
                 y.append(self.label_vocab.word2id[label])
 
@@ -158,7 +173,12 @@ class SupervisedDictionary(object):
                 words.append(self.word_vocab.id2word[w_id])
         return words
 
-    def update_vocab_from_word_set(self, predefined_set: set):
+    def update_vocab_from_word_set(self, predefined_set: set) -> None:
+        """
+        Remove or replace word by using pre-defined word vocab such as pre-trained model's vocab.s
+        :param predefined_set: Set of str.
+        :return: None
+        """
         assert self.is_tokenized
 
         if self.replace_OOV_word:

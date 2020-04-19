@@ -1,20 +1,19 @@
-import random
 import json
 import logging
+import random
 
-from gensim.models import KeyedVectors
 import hydra
 import numpy as np
 import torch
 import torch.nn.functional as F
+from gensim.models import KeyedVectors
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
 
+from .dataset import SentenceDataset
+from .dictionary import SupervisedDictionary
 from .model import SupervisedFastText
 from .utils import EarlyStopping
-from .dictionary import SupervisedDictionary
-from .dataset import SentenceDataset
-
 
 _valid_initialised_methods = ['uniform', 'mean']
 
@@ -56,12 +55,12 @@ def evaluation(model, device, test_iter, divide_by_num_data=True):
     N = len(test_iter)
 
     with torch.no_grad():
-        for sentence, label in test_iter:
+        for sentence, label, _ in test_iter:
             sentence, label = sentence.to(device), label.to(device)
             output = model(sentence)
             loss += F.nll_loss(output, label).item()
-            pred = output.argmax(1, keepdim=True)
-            correct += pred.eq(label.view_as(pred)).sum().item()
+            pred = output.argmax(1, keepdim=False)
+            correct += pred.eq(label).sum().item()
 
     if divide_by_num_data:
         return loss / N, correct / N
@@ -83,6 +82,7 @@ def check_conf(cfg):
     assert 0 < cfg['parameters']['patience']
     assert cfg['parameters']['metric'] in ['loss', 'acc']
     assert cfg['parameters']['initialize_oov'] in _valid_initialised_methods
+
 
 @hydra.main(config_path='../conf/config.yaml')
 def main(cfg):
@@ -130,9 +130,21 @@ def main(cfg):
     if pretrained_vocab:
         dictionary.update_vocab_from_word_set(pretrained_vocab)
 
-    train_set = SentenceDataset(*dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['train_fname']), train=True)
-    val_set = SentenceDataset(*dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['val_fname']), train=False)
-    test_set = SentenceDataset(*dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['test_fname']), train=False)
+    train_set = SentenceDataset(
+        *dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['train_fname']),
+        size_vocab=dictionary.size_word_vocab,
+        train=True
+    )
+    val_set = SentenceDataset(
+        *dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['val_fname']),
+        dictionary.size_word_vocab,
+        train=False
+    )
+    test_set = SentenceDataset(
+        *dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['test_fname']),
+        dictionary.size_word_vocab,
+        train=False
+    )
 
     num_workers = 4
     train_data_loader = DataLoader(
@@ -175,21 +187,20 @@ def main(cfg):
         )
         dim = pretrained_word_vectors.shape[1]
 
-
     logger.info('Use {}\n'.format(device))
     logger.info('#training_data: {}, #val_data: {}, #test_data: {}\n'.format(
         len(train_data_loader.dataset), len(val_data_loader.dataset), len(test_data_loader.dataset)),
     )
     logger.info('In training data, the size of word vocab: {} ngram vocab: {}, total: {} \n'.format(
         dictionary.size_word_vocab, dictionary.size_ngram_vocab, dictionary.size_total_vocab
-        )
+    )
     )
 
     model = SupervisedFastText(
         V=dictionary.size_total_vocab,
         num_classes=len(dictionary.label_vocab),
         embedding_dim=dim,
-        pre_trained_emb=pretrained_word_vectors,
+        pretrained_emb=pretrained_word_vectors,
         freeze=is_freeze,
         pooling=pooling
     ).to(device)
@@ -224,25 +235,26 @@ def main(cfg):
         correct = 0
         model.train()
 
-        for batch_idx, (sentence, label) in enumerate(train_data_loader):
+        for sentence, label, n_tokens in train_data_loader:
             sentence, label = sentence.to(device), label.to(device)
             optimizer.zero_grad()
             output = model(sentence)
             loss = F.nll_loss(output, label)
             loss.backward()
             optimizer.step()
-            pred = output.argmax(1, keepdim=True)
-            # TODO: can we optimise the following evaluation part?
-            correct += pred.eq(label.view_as(pred)).sum().item()
+            pred = output.argmax(1, keepdim=False)
+            correct += pred.eq(label).sum().item()
             sum_loss += loss.item()
 
             # update learning rate
-            local_processed_tokens += sentence.shape[1]
+            # ref: https://github.com/facebookresearch/fastText/blob/6d7c77cd33b23eec26198fdfe10419476b5364c7/src/fasttext.cc#L656
+            local_processed_tokens += n_tokens.item()
             if local_processed_tokens > learning_rate_schedule:
                 num_processed_tokens += local_processed_tokens
                 local_processed_tokens = 0
                 progress = num_processed_tokens / total_num_processed_tokens_in_training
                 optimizer.param_groups[0]['lr'] = cfg['parameters']['lr'] * (1. - progress)
+
         train_loss = sum_loss / N
         train_acc = correct / N
         # end training phase

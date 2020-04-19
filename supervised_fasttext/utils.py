@@ -27,9 +27,9 @@ class EarlyStopping(object):
             self._is_better = lambda a, best: a > best + self.min_delta
             self.best = np.finfo(np.float(0.)).min
 
-    def is_stopped(self, metric):
+    def is_stopped(self, metric: float):
         """
-        :param metric: monitored value such as validation accuracy or validation loss.
+        :param metric: Monitored value such as validation accuracy or validation loss.
         :return: Boolean
         """
 

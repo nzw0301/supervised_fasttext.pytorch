@@ -9,7 +9,7 @@ class SupervisedFastText(nn.Module):
             V: int,
             num_classes: int,
             embedding_dim=10,
-            pre_trained_emb=None,
+            pretrained_emb=None,
             freeze=True,
             pooling="mean"
     ):
@@ -17,8 +17,10 @@ class SupervisedFastText(nn.Module):
         :param V: the size of set of words and n-grams
         :param num_classes: the number of classes
         :param embedding_dim: the number of dimensions of word vector
+        :param pretrained_emb: torch.floatTensor. Pretrained word embeddings.
         :param freeze: Boolean. If it is true and `pre_trained_emb` is not None,
             word embeddings are re-trained on the supervised data.
+        :param pooling: pooling method over words and ngrams in the sentence. Valid values in [mean, sum, min, max, min-max]
         """
         super(SupervisedFastText, self).__init__()
 
@@ -34,10 +36,10 @@ class SupervisedFastText(nn.Module):
         self.hidden2out = nn.Linear(in_features=num_hidden, out_features=num_classes)
 
         # https://github.com/facebookresearch/fastText/blob/25d0bb04bf43d8b674fe9ae5722ef65a0856f5d6/src/fasttext.cc#L669
-        if pre_trained_emb is None:
+        if pretrained_emb is None:
             self.reset_parameters_input2hidden()
         else:
-            self.input2embeddings = nn.Embedding.from_pretrained(pre_trained_emb, freeze)
+            self.input2embeddings = nn.Embedding.from_pretrained(pretrained_emb, freeze)
 
         self.reset_parameters_hidden2output()
 

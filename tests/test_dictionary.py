@@ -5,7 +5,7 @@ import numpy as np
 
 from supervised_fasttext.dictionary import SupervisedDictionary
 
-PREDEFINED_VOCAB = {'a', 'b', 'c'}
+PREDEFINED_VOCAB = {"a", "b", "c"}
 
 
 def create_test_corpus_files(fname):
@@ -45,7 +45,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word="</s>"
             )
 
@@ -71,7 +71,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word="</s>"
             )
 
@@ -95,7 +95,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word="</s>"
             )
 
@@ -120,7 +120,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -146,7 +146,7 @@ def tests():
                 replace_word="",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -171,7 +171,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -197,7 +197,7 @@ def tests():
                 replace_word="",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -222,7 +222,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -262,7 +262,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=2,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -289,7 +289,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=2,
                 word_n_gram_min_count=2,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -316,7 +316,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=2,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -343,7 +343,7 @@ def tests():
                 replace_word="",
                 size_word_n_gram=2,
                 word_n_gram_min_count=3,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -370,7 +370,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=2,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -404,7 +404,7 @@ def tests():
                 replace_word="",
                 size_word_n_gram=1,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -423,7 +423,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=2,
                 word_n_gram_min_count=1,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -443,7 +443,7 @@ def tests():
                 replace_word="<UNK>",
                 size_word_n_gram=2,
                 word_n_gram_min_count=3,
-                label_separator='\t',
+                label_separator="\t",
                 line_break_word=""
             )
 
@@ -460,7 +460,6 @@ def tests():
         test_without_ngram(fname)
         test_with_ngram(fname)
 
-
     fname = "doc.txt"
     create_test_corpus_files(fname)
 
@@ -468,4 +467,4 @@ def tests():
     tests_fit_with_ngram(fname)
 
     test_transform(fname)
-    # delete_test_corpus_files(fname)
+    delete_test_corpus_files(fname)
