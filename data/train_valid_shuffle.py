@@ -30,7 +30,7 @@ y = np.array(y)
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=args.val, random_state=rnd, shuffle=True, stratify=y)
 
 splits = input_fname.split('.')
-fname, file_extension = '.'.join(splits[:-1]) , splits[-1]
+fname, file_extension = '.'.join(splits[:-1]), splits[-1]
 
 train_fname = '{}.{}.{}'.format(fname, seed, file_extension)
 with open(train_fname, 'w') as f:

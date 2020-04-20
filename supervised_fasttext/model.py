@@ -20,7 +20,8 @@ class SupervisedFastText(nn.Module):
         :param pretrained_emb: torch.floatTensor. Pretrained word embeddings.
         :param freeze: Boolean. If it is true and `pre_trained_emb` is not None,
             word embeddings are re-trained on the supervised data.
-        :param pooling: pooling method over words and ngrams in the sentence. Valid values in [mean, sum, min, max, min-max]
+        :param pooling: pooling method over words and ngrams in the sentence.
+            Valid values in [mean, sum, min, max, min-max]
         """
         super(SupervisedFastText, self).__init__()
 

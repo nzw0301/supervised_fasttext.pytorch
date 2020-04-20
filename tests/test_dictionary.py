@@ -112,7 +112,6 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
-
         def test_fit_without_eos(fname):
             dictionary = SupervisedDictionary(
                 replace_OOV_word=True,
@@ -190,7 +189,7 @@ def tests():
             # label related test
             assert len(dictionary.label_vocab) == 6
 
-            ## min_count == 2
+            # min_count == 2
             dictionary = SupervisedDictionary(
                 replace_OOV_word=False,
                 min_count=2,
@@ -245,8 +244,6 @@ def tests():
 
             # label related test
             assert len(dictionary.label_vocab) == 6
-
-
 
         test_fit_without_replace_and_add_special(fname)
         test_fit_without_replace_mincount(fname)
@@ -435,7 +432,6 @@ def tests():
 
             recovered_sentence = dictionary.recover_sentence_from_ids(X[3])
             assert recovered_sentence == ["d", "d", "d", "d", "d-d", "d-d", "d-d"]
-
 
             dictionary = SupervisedDictionary(
                 replace_OOV_word=True,

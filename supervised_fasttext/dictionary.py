@@ -94,7 +94,6 @@ class SupervisedDictionary(object):
                 self.size_ngram_vocab = len(self.ngram_vocab)
         self.size_total_vocab = self.size_word_vocab + self.size_ngram_vocab
 
-
     def _sentence2cleaned_words(self, sentence: str):
         """
         Convert str into list of str. Words in list do not contain OOV words.
