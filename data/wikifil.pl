@@ -10,8 +10,8 @@ while (<>) {
     s/&amp;/&/g;            # decode URL encoded chars
     s/&lt;/</g;
     s/&gt;/>/g;
-    # s/<ref[^<]*<\/ref>//g;  # remove references <ref...> ... </ref>
-    # s/<[^>]*>//g;           # remove xhtml tags
+    s/<ref[^<]*<\/ref>//g;  # remove references <ref...> ... </ref>
+    s/<[^>]*>//g;           # remove xhtml tags
     s/\[http:[^] ]*/[/g;    # remove normal url, preserve visible text
     s/\|thumb//ig;          # remove images links, preserve caption
     s/\|left//ig;
