@@ -12,10 +12,10 @@ from gensim.models import KeyedVectors
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
 
-from .dataset import SentenceDataset
-from .dictionary import SupervisedDictionary
-from .model import SupervisedFastText
-from .utils import EarlyStopping
+from supervised_fasttext.dataset import SentenceDataset
+from supervised_fasttext.dictionary import SupervisedDictionary
+from supervised_fasttext.model import SupervisedFastText
+from supervised_fasttext.utils import EarlyStopping
 
 _valid_initialised_methods = ['uniform', 'mean']
 
