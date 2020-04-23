@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import random
 
 import hydra
@@ -302,14 +303,16 @@ def main(cfg):
     learning_history['test_loss'] = test_loss
     learning_history['test_acc'] = test_acc
 
-    # logging_file
-    with open(cfg['parameters']['logging_file'], 'w') as log_file:
-        json.dump(learning_history, log_file)
-
     logger.info('\nTest loss: {:.4f}, test acc.: {:.1f}%'.format(
         test_loss,
         test_acc * 100
     ))
+
+    # logging_file
+    output_path_fname = os.getcwd() + cfg['parameters']['logging_file']
+    logger.info('Saving training history and evaluation scores in {}'.format(output_path_fname))
+    with open(output_path_fname, 'w') as log_file:
+        json.dump(learning_history, log_file)
 
 
 if __name__ == '__main__':
