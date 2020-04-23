@@ -35,7 +35,7 @@ parameters:
   pooling: mean
   pre_trained: null
   replace_OOV: 0
-  seed: 7
+  seed: 0
   word_n_gram_min_count: 10
 ```
 
