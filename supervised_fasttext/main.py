@@ -7,6 +7,7 @@ import hydra
 import numpy as np
 import torch
 import torch.nn.functional as F
+from hydra import utils
 from gensim.models import KeyedVectors
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
@@ -107,12 +108,15 @@ def main(cfg):
 
     device = torch.device('cuda:{}'.format(cfg['parameters']['gpu_id']) if use_cuda else 'cpu')
 
+    working_dir = utils.get_original_cwd() + '/'
+
     # load embeddings
     pretrained_path = cfg['parameters']['pre_trained']
     pretrained_vocab = {}
     if pretrained_path:
+        pretrained_path = working_dir + cfg['parameters']['pre_trained']
         logger.info('Loading pre-trained word embeddings {}\n'.format(pretrained_path))
-        pretrained_w2v = KeyedVectors.load_word2vec_format(fname=pretrained_path)
+        pretrained_w2v = KeyedVectors.load_word2vec_format(fname=working_dir+pretrained_path)
         pretrained_vocab = set(pretrained_w2v.vocab.keys())
         assert cfg['parameters']['ngram'] == 1
 
@@ -126,23 +130,24 @@ def main(cfg):
         line_break_word=""
     )
 
-    dictionary.fit(cfg['dataset']['path'] + cfg['dataset']['train_fname'])
+    training_path = working_dir + cfg['dataset']['path'] + cfg['dataset']['train_fname']
+    dictionary.fit(training_path)
 
     if pretrained_vocab:
         dictionary.update_vocab_from_word_set(pretrained_vocab)
 
     train_set = SentenceDataset(
-        *dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['train_fname']),
+        *dictionary.transform(training_path),
         size_vocab=dictionary.size_word_vocab,
         train=True
     )
     val_set = SentenceDataset(
-        *dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['val_fname']),
+        *dictionary.transform(working_dir + cfg['dataset']['path'] + cfg['dataset']['val_fname']),
         dictionary.size_word_vocab,
         train=False
     )
     test_set = SentenceDataset(
-        *dictionary.transform(cfg['dataset']['path'] + cfg['dataset']['test_fname']),
+        *dictionary.transform(working_dir + cfg['dataset']['path'] + cfg['dataset']['test_fname']),
         dictionary.size_word_vocab,
         train=False
     )
@@ -309,7 +314,7 @@ def main(cfg):
     ))
 
     # logging_file
-    output_path_fname = os.getcwd() + cfg['parameters']['logging_file']
+    output_path_fname = os.getcwd() + '/' + cfg['parameters']['logging_file']
     logger.info('Saving training history and evaluation scores in {}'.format(output_path_fname))
     with open(output_path_fname, 'w') as log_file:
         json.dump(learning_history, log_file)
