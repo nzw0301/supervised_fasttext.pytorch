@@ -152,7 +152,7 @@ def main(cfg):
         train=False
     )
 
-    num_workers = 4
+    num_workers = 1
     train_data_loader = DataLoader(
         train_set,
         batch_size=1,
