@@ -116,7 +116,7 @@ def main(cfg):
     if pretrained_path:
         pretrained_path = working_dir + cfg['parameters']['pre_trained']
         logger.info('Loading pre-trained word embeddings {}\n'.format(pretrained_path))
-        pretrained_w2v = KeyedVectors.load_word2vec_format(fname=working_dir+pretrained_path)
+        pretrained_w2v = KeyedVectors.load_word2vec_format(fname=pretrained_path)
         pretrained_vocab = set(pretrained_w2v.vocab.keys())
         assert cfg['parameters']['ngram'] == 1
 
