@@ -270,9 +270,9 @@ def main(cfg):
 
         progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
         logger.info(
-            '\rProgress: {:.7f} Avg. train loss: {:.4f}, train acc: {:.1f}%, '
+            '\rProgress: {:.1f}% Avg. train loss: {:.4f}, train acc: {:.1f}%, '
             'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(
-                progress, train_loss, train_acc * 100, val_loss, val_acc * 100
+                progress * 100., train_loss, train_acc * 100, val_loss, val_acc * 100
             )
         )
 
