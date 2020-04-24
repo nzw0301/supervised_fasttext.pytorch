@@ -1,5 +1,6 @@
 defaults:
     - dataset: imdb
+    - hydra/output : imdb
 
 parameters:
     dim: 10 # the number of vector dimensions
