@@ -1,5 +1,5 @@
 dataset:
-    path: data/sst/fine
+    path: data/sst/fine/
     train_fname: train.tsv
     val_fname: val.tsv
     test_fname: test.tsv
