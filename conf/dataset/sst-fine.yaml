@@ -3,3 +3,4 @@ dataset:
     train_fname: train.tsv
     val_fname: val.tsv
     test_fname: test.tsv
+    name: sst-file

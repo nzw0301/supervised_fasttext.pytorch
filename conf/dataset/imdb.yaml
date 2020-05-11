@@ -3,3 +3,4 @@ dataset:
     train_fname: train.0.tsv
     val_fname: train.0.val.tsv
     test_fname: test.tsv
+    name: imdb
