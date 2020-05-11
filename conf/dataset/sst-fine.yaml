@@ -1,0 +1,5 @@
+dataset:
+    path: data/sst/fine
+    train_fname: sentiment-train.tsv
+    val_fname: sentiment-dev.tsv
+    test_fname: sentiment-test.tsv
