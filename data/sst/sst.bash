@@ -39,7 +39,7 @@ do
     rm $data_path/sentiment-$split.normalized $data_path/sentiment-$split
 done
 
-# # SST fine-grained
+# SST fine-grained
 data_path=./fine
 rm -rf $data_path
 mkdir $data_path

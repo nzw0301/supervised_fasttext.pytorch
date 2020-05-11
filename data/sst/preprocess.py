@@ -11,7 +11,15 @@ str2id = {
 fin_name = sys.argv[1]
 num_classes = int(sys.argv[2])
 assert num_classes in [2, 5]
-fout_name = fin_name.replace('normalized', 'tsv')
+
+replace_patterns = {
+    'sentiment-dev.normalized': 'train.tsv',
+    'sentiment-test.normalized': 'val.tsv',
+    'sentiment-train.normalized': 'test.tsv'
+}
+
+fname = fin_name.split('/')[-1]
+fout_name = fin_name.replace(fname, replace_patterns[fname])
 
 with open(fin_name) as fin, open(fout_name, 'w') as fout:
     for l in fin:
