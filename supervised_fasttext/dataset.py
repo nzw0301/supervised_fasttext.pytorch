@@ -14,16 +14,27 @@ class SentenceDataset(torch.utils.data.dataset.Dataset):
         :param data: numpy array of numpy array. Each element is np.array of int array.
         :param targets: numpy array of int. Each element represents label.
         :param size_vocab: the size of word vocab. It is used to calculate sentence lengths that don't contain n-gram.
-        :param train: Boolean. If true, sentence length is stored, else it is empty.
+        :param train: Boolean. If true, sentence length is stored and remove empty sentences, else it is empty.
         """
 
-        self.data = data
-        self.targets = targets
-        self.train = train
+        self.data = []
+        self.targets = []
         self.lengths = []
+        self.train = train
+
         if self.train:
-            for sentence in data:
-                self.lengths.append(np.sum(sentence < size_vocab))
+            for (sentence, label) in zip(data):
+                length = np.sum(sentence < size_vocab)
+                if length > 0:
+                    self.data.append(sentence)
+                    self.targets.append(label)
+                    self.lengths.append(length)
+            self.data = np.array(self.data)
+            self.targets = np.array(self.targets)
+        else:
+            self.data = data
+            self.targets = targets
+
 
     def __len__(self) -> int:
         return len(self.data)
