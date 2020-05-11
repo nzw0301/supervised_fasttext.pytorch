@@ -80,7 +80,7 @@ class SupervisedDictionary(object):
 
             if self.size_word_n_gram > 1:
                 f.seek(0)
-                for line_id, line in enumerate(f):
+                for line_id, line in enumerate(f, start=1):
                     elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                     if len(elements) == 1:
                         self.logger.warning('{}th line is empty'.format(line_id))
@@ -139,9 +139,10 @@ class SupervisedDictionary(object):
         X = []
         y = []
         with open(fname) as f:
-            for line in f:
+            for line_id, line in enumerate(f, start=1):
                 elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                 if len(elements) == 1:
+                    self.logger.warning('{}th line is empty'.format(line_id))
                     label, sentence = elements[0], ""
                 else:
                     label, sentence = elements
