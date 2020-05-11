@@ -65,10 +65,10 @@ class SupervisedDictionary(object):
             self.logger.warning("Warning: this instance has already fitted.")
 
         with open(fname) as f:
-            for line in f:
+            for line_id, line in enumerate(f, start=1):
                 elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                 if len(elements) == 1:
-                    self.logger.warning('something wrong')
+                    self.logger.warning('{}th line is empty'.format(line_id))
                     continue
                 label, sentence = elements
                 sentence += " " + self.line_break_word
@@ -80,10 +80,10 @@ class SupervisedDictionary(object):
 
             if self.size_word_n_gram > 1:
                 f.seek(0)
-                for line in f:
+                for line_id, line in enumerate(f):
                     elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                     if len(elements) == 1:
-                        self.logger.warning('something wrong')
+                        self.logger.warning('{}th line is empty'.format(line_id))
                         continue
                     sentence = elements[1] + " " + self.line_break_word
                     processed_words = self._sentence2cleaned_words(sentence)
@@ -142,8 +142,9 @@ class SupervisedDictionary(object):
             for line in f:
                 elements = line.strip().split(sep=self.label_separator, maxsplit=2)
                 if len(elements) == 1:
-                    continue
-                label, sentence = elements
+                    label, sentence = elements[0], ""
+                else:
+                    label, sentence = elements
                 sentence = sentence + " " + self.line_break_word
                 words = self._sentence2cleaned_words(sentence)
                 word_ids = np.array(self._words2word_ids(words), dtype=np.int64)

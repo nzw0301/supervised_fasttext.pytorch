@@ -13,9 +13,9 @@ num_classes = int(sys.argv[2])
 assert num_classes in [2, 5]
 
 replace_patterns = {
-    'sentiment-dev.normalized': 'train.tsv',
-    'sentiment-test.normalized': 'val.tsv',
-    'sentiment-train.normalized': 'test.tsv'
+    'sentiment-dev.normalized': 'val.tsv',
+    'sentiment-test.normalized': 'test.tsv',
+    'sentiment-train.normalized': 'train.tsv'
 }
 
 fname = fin_name.split('/')[-1]

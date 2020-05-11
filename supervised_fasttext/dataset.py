@@ -23,7 +23,7 @@ class SentenceDataset(torch.utils.data.dataset.Dataset):
         self.train = train
 
         if self.train:
-            for (sentence, label) in zip(data):
+            for (sentence, label) in zip(data, targets):
                 length = np.sum(sentence < size_vocab)
                 if length > 0:
                     self.data.append(sentence)

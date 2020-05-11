@@ -107,7 +107,7 @@ def evaluation(model, device, test_data_loader, divide_by_num_data=True):
 
     with torch.no_grad():
         for sentence, label, _ in test_data_loader:
-            if len(sentence) == 0:
+            if len(sentence[0]) == 0:
                 continue
             sentence, label = sentence.to(device), label.to(device)
             output = model(sentence)
