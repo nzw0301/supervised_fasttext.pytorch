@@ -2,88 +2,209 @@ import json
 import logging
 import os
 import random
+from pathlib import Path
 
 import hydra
 import numpy as np
+import optuna
 import torch
 import torch.nn.functional as F
-from hydra import utils
 from gensim.models import KeyedVectors
+from hydra import utils
+from optuna.samplers import TPESampler
 from torch import optim
-from torch.utils.data.dataloader import DataLoader
 
 from supervised_fasttext.dataset import SentenceDataset
 from supervised_fasttext.dictionary import SupervisedDictionary
+from supervised_fasttext.experiments import evaluation
+from supervised_fasttext.experiments import get_datasets, datasets2data_loaders
+from supervised_fasttext.experiments import initialise_word_embeddigns_from_pretrained_embeddings
 from supervised_fasttext.model import SupervisedFastText
-from supervised_fasttext.utils import EarlyStopping
-
-_valid_initialised_methods = ['uniform', 'mean']
+from supervised_fasttext.utils import check_hydra_conf
 
 
-def initialise_word_embeddigns_from_pretrained_embeddings(
-        embeddings: KeyedVectors, dictionary: SupervisedDictionary,
-        OOV_initialised_method: str, rnd: np.random.RandomState
-):
-    assert OOV_initialised_method in _valid_initialised_methods
+class Objective(object):
+    def __init__(self, hydra_cfg, logger):
+        self.logger = logger
+        self.hydra_cfg = hydra_cfg
+        self.seed = hydra_cfg['parameters']['seed']
+        self.metric = hydra_cfg['parameters']['metric']
 
-    shape = (dictionary.size_word_vocab, embeddings.vector_size)
+        self.device = torch.device(
+            'cuda:{}'.format(hydra_cfg['parameters']['gpu_id']) if torch.cuda.is_available() else 'cpu')
 
-    if OOV_initialised_method == 'uniform':
-        upper = 1. / embeddings.vector_size
-        pretrained_word_vectors = rnd.rand(-upper, upper, size=shape).astype(dtype=np.float32)
-    else:
-        global_mean_vector = np.mean(embeddings.vectors, axis=0)
-        pretrained_word_vectors = np.tile(global_mean_vector, (dictionary.size_word_vocab, 1))
+        working_dir = utils.get_original_cwd() + '/'
+        training_path = working_dir + hydra_cfg['dataset']['path'] + hydra_cfg['dataset']['train_fname']
+        is_replaced_OOV = hydra_cfg['parameters']['replace_OOV'] > 0
 
-    for word_id, word in enumerate(dictionary.word_vocab.id2word):
-        if word == dictionary.replace_word:
-            continue
-        pretrained_word_vectors[word_id] = embeddings.get_vector(word)
+        # load embeddings
+        pretrained_path = hydra_cfg['parameters']['pre_trained']
+        pretrained_vocab = {}
+        if pretrained_path:
+            pretrained_path = working_dir + hydra_cfg['parameters']['pre_trained']
+            self.logger.info('Loading pre-trained word embeddings {}\n'.format(pretrained_path))
+            pretrained_w2v = KeyedVectors.load_word2vec_format(fname=pretrained_path)
+            pretrained_vocab = set(pretrained_w2v.vocab.keys())
+            assert hydra_cfg['parameters']['ngram'] == 1
 
-    return torch.from_numpy(pretrained_word_vectors)
+        self.dictionary = SupervisedDictionary(
+            replace_OOV_word=is_replaced_OOV,
+            min_count=hydra_cfg['parameters']['min_count'],
+            replace_word='<OOV>',
+            size_word_n_gram=hydra_cfg['parameters']['ngram'],
+            word_n_gram_min_count=hydra_cfg['parameters']['word_n_gram_min_count'],
+            label_separator=hydra_cfg['parameters']['label_separator'],
+            line_break_word=''
+        )
 
+        self.logger.info('Use {}\n'.format(self.device))
 
-def evaluation(model, device, test_iter, divide_by_num_data=True):
-    """
-    :param model:
-    :param device:
-    :param test_iter:
-    :param divide_by_num_data:
-    :return:
-    """
-    model.eval()
-    loss = 0.
-    correct = 0
-    N = len(test_iter)
+        self.dictionary.fit(training_path)
 
-    with torch.no_grad():
-        for sentence, label, _ in test_iter:
-            sentence, label = sentence.to(device), label.to(device)
-            output = model(sentence)
-            loss += F.nll_loss(output, label).item()
-            pred = output.argmax(1, keepdim=False)
-            correct += pred.eq(label).sum().item()
+        if pretrained_vocab:
+            self.dictionary.update_vocab_from_word_set(pretrained_vocab)
 
-    if divide_by_num_data:
-        return loss / N, correct / N
-    else:
-        return loss, correct
+        self.train_set, self.val_set = get_datasets(
+            cfg=hydra_cfg, dictionary=self.dictionary, working_dir=working_dir, training_path=training_path,
+            include_test=False
+        )
 
+        pretrained_word_vectors = None
+        dim = self.hydra_cfg['parameters']['dim']
 
-def check_conf(cfg):
-    """
-    Validate the hydra'S config parameters
-    :param cfg:
-    :return: None
-    """
-    assert 0 < cfg['parameters']['dim']
-    assert 0 < cfg['parameters']['min_count']
-    assert 0 < cfg['parameters']['epochs']
-    assert 0. < cfg['parameters']['lr']
-    assert 0. < cfg['parameters']['lr_update_rate']
-    assert 0 < cfg['parameters']['patience']
-    assert cfg['parameters']['metric'] in ['loss', 'acc']
-    assert cfg['parameters']['initialize_oov'] in _valid_initialised_methods
+        self.pooling = self.hydra_cfg['parameters']['pooling']
+
+        OOV_initialized_method = self.hydra_cfg['parameters']['initialize_oov']
+        self.is_freeze = self.hydra_cfg['parameters']['freeze'] > 0
+
+        if pretrained_word_vectors:
+            pretrained_word_vectors = initialise_word_embeddigns_from_pretrained_embeddings(
+                pretrained_w2v, self.dictionary, OOV_initialized_method, rnd=np.random.RandomState(self.seed)
+            )
+            dim = pretrained_word_vectors.shape[1]
+        self.pretrained_word_vectors = pretrained_word_vectors
+        self.dim = dim
+
+        self.logger.info('#training_data: {}, #val_data: {}\n'.format(
+            len(self.train_set), len(self.val_set)
+        ))
+        self.logger.info('In training data, the size of word vocab: {} ngram vocab: {}, total: {} \n'.format(
+            self.dictionary.size_word_vocab, self.dictionary.size_ngram_vocab, self.dictionary.size_total_vocab
+        ))
+
+    def __call__(self, trial: optuna.Trial):
+        torch.manual_seed(self.seed)
+        random.seed(self.seed)
+
+        train_data_loader, val_data_loader = datasets2data_loaders(
+            self.train_set, self.val_set, test_set=None, num_workers=1
+        )
+
+        epochs = self.hydra_cfg['parameters']['epochs']
+
+        # Calculate an objective value by using the extra arguments.
+        model = SupervisedFastText(
+            V=self.dictionary.size_total_vocab,
+            num_classes=len(self.dictionary.label_vocab),
+            embedding_dim=self.dim,
+            pretrained_emb=self.pretrained_word_vectors,
+            freeze=self.is_freeze,
+            pooling=self.pooling
+        ).to(self.device)
+
+        initial_lr = trial.suggest_loguniform(
+            'lr',
+            self.hydra_cfg['optuna']['lr_min'],
+            self.hydra_cfg['optuna']['lr_max']
+        )
+
+        optimizer = optim.SGD(model.parameters(), lr=initial_lr)
+
+        # parameters for update learning rate
+        num_tokens = self.dictionary.num_words
+
+        learning_rate_schedule = self.hydra_cfg['parameters']['lr_update_rate']
+        total_num_processed_tokens_in_training = epochs * num_tokens
+        num_processed_tokens = 0
+        local_processed_tokens = 0
+        N = len(train_data_loader.dataset)
+
+        best_val_loss = np.finfo(0.).max
+        best_val_acc = np.finfo(0.).min
+        save_fname = os.getcwd() + '/' + '{}.pt'.format(trial.number)  # file name to store best model's weights
+
+        for epoch in range(epochs):
+            # begin training phase
+            sum_loss = 0.
+            correct = 0
+            model.train()
+
+            for sentence, label, n_tokens in train_data_loader:
+                sentence, label = sentence.to(self.device), label.to(self.device)
+                optimizer.zero_grad()
+                output = model(sentence)
+                loss = F.nll_loss(output, label)
+                loss.backward()
+                optimizer.step()
+                pred = output.argmax(1, keepdim=False)
+                correct += pred.eq(label).sum().item()
+                sum_loss += loss.item()
+
+                # update learning rate
+                # ref: https://github.com/facebookresearch/fastText/blob/6d7c77cd33b23eec26198fdfe10419476b5364c7/src/fasttext.cc#L656
+                local_processed_tokens += n_tokens.item()
+                if local_processed_tokens > learning_rate_schedule:
+                    num_processed_tokens += local_processed_tokens
+                    local_processed_tokens = 0
+                    progress = num_processed_tokens / total_num_processed_tokens_in_training
+                    optimizer.param_groups[0]['lr'] = initial_lr * (1. - progress)
+
+            train_loss = sum_loss / N
+            train_acc = correct / N
+            # end training phase
+
+            val_loss, val_acc = evaluation(model, self.device, val_data_loader)
+
+            progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
+            self.logger.info(
+                '\rProgress: {:.1f}% Avg. train loss: {:.4f}, train acc: {:.1f}%, '
+                'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(
+                    progress * 100., train_loss, train_acc * 100, val_loss, val_acc * 100
+                )
+            )
+
+            if self.metric == 'loss':
+                trial.report(val_loss, epoch)
+            else:
+                trial.report(val_acc, epoch)
+
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+
+            # validation
+            is_saved_model = False
+            if self.metric == 'loss':
+                if best_val_loss > val_loss:
+                    best_val_loss = val_loss
+                    best_val_acc = val_acc
+                    is_saved_model = True
+            else:
+                if best_val_acc < val_acc:
+                    best_val_loss = val_loss
+                    best_val_acc = val_acc
+                    is_saved_model = True
+
+            if is_saved_model:
+                torch.save(model.state_dict(), save_fname)
+
+        trial.set_user_attr('val_loss', best_val_loss)
+        trial.set_user_attr('val_acc', best_val_acc)
+        trial.set_user_attr('model_path', save_fname)
+
+        if self.metric == 'loss':
+            return best_val_loss
+        else:
+            return best_val_acc
 
 
 @hydra.main(config_path='../conf/config.yaml')
@@ -95,229 +216,76 @@ def main(cfg):
     stream_handler.terminator = ''
     logger.addHandler(stream_handler)
 
-    check_conf(cfg)
-
-    use_cuda = torch.cuda.is_available()
-
-    torch.manual_seed(cfg['parameters']['seed'])
-    random.seed(cfg['parameters']['seed'])
-    rnd = np.random.RandomState(cfg['parameters']['seed'])
-    OOV_initialized_method = cfg['parameters']['initialize_oov']
-    is_freeze = cfg['parameters']['freeze'] > 0
-    is_replaced_OOV = cfg['parameters']['replace_OOV'] > 0
-
-    device = torch.device('cuda:{}'.format(cfg['parameters']['gpu_id']) if use_cuda else 'cpu')
-
-    working_dir = utils.get_original_cwd() + '/'
-
-    # load embeddings
-    pretrained_path = cfg['parameters']['pre_trained']
-    pretrained_vocab = {}
-    if pretrained_path:
-        pretrained_path = working_dir + cfg['parameters']['pre_trained']
-        logger.info('Loading pre-trained word embeddings {}\n'.format(pretrained_path))
-        pretrained_w2v = KeyedVectors.load_word2vec_format(fname=pretrained_path)
-        pretrained_vocab = set(pretrained_w2v.vocab.keys())
-        assert cfg['parameters']['ngram'] == 1
-
-    dictionary = SupervisedDictionary(
-        replace_OOV_word=is_replaced_OOV,
-        min_count=cfg['parameters']['min_count'],
-        replace_word="<OOV>",
-        size_word_n_gram=cfg['parameters']['ngram'],
-        word_n_gram_min_count=cfg['parameters']['word_n_gram_min_count'],
-        label_separator=cfg['parameters']['label_separator'],
-        line_break_word=""
-    )
-
-    training_path = working_dir + cfg['dataset']['path'] + cfg['dataset']['train_fname']
-    dictionary.fit(training_path)
-
-    if pretrained_vocab:
-        dictionary.update_vocab_from_word_set(pretrained_vocab)
-
-    train_set = SentenceDataset(
-        *dictionary.transform(training_path),
-        size_vocab=dictionary.size_word_vocab,
-        train=True
-    )
-    val_set = SentenceDataset(
-        *dictionary.transform(working_dir + cfg['dataset']['path'] + cfg['dataset']['val_fname']),
-        dictionary.size_word_vocab,
-        train=False
-    )
-    test_set = SentenceDataset(
-        *dictionary.transform(working_dir + cfg['dataset']['path'] + cfg['dataset']['test_fname']),
-        dictionary.size_word_vocab,
-        train=False
-    )
-
-    num_workers = 1
-    train_data_loader = DataLoader(
-        train_set,
-        batch_size=1,
-        shuffle=True,
-        num_workers=num_workers
-    )
-
-    val_data_loader = DataLoader(
-        val_set,
-        batch_size=1,
-        shuffle=False,
-        num_workers=num_workers
-    )
-
-    test_data_loader = DataLoader(
-        test_set,
-        batch_size=1,
-        shuffle=False,
-        num_workers=num_workers
-    )
+    check_hydra_conf(cfg)
 
     metric = cfg['parameters']['metric']
     if metric == 'loss':
-        mode = 'min'
+        direction = 'minimize'
     else:
-        mode = 'max'
+        direction = 'maximize'
 
-    early_stopping = EarlyStopping(mode=mode, patience=cfg['parameters']['patience'])
-
-    epochs = cfg['parameters']['epochs']
-    pretrained_word_vectors = None
-    dim = cfg['parameters']['dim']
-    pooling = cfg['parameters']['pooling']
-
-    if pretrained_path:
-        pretrained_word_vectors = initialise_word_embeddigns_from_pretrained_embeddings(
-            pretrained_w2v, dictionary, OOV_initialized_method, rnd
-        )
-        dim = pretrained_word_vectors.shape[1]
-
-    logger.info('Use {}\n'.format(device))
-    logger.info('#training_data: {}, #val_data: {}, #test_data: {}\n'.format(
-        len(train_data_loader.dataset), len(val_data_loader.dataset), len(test_data_loader.dataset)),
-    )
-    logger.info('In training data, the size of word vocab: {} ngram vocab: {}, total: {} \n'.format(
-        dictionary.size_word_vocab, dictionary.size_ngram_vocab, dictionary.size_total_vocab
-    )
-    )
-
-    model = SupervisedFastText(
-        V=dictionary.size_total_vocab,
-        num_classes=len(dictionary.label_vocab),
-        embedding_dim=dim,
-        pretrained_emb=pretrained_word_vectors,
-        freeze=is_freeze,
-        pooling=pooling
-    ).to(device)
-
-    optimizer = optim.SGD(model.parameters(), lr=cfg['parameters']['lr'])
-
-    # parameters for update learning rate
-    num_tokens = dictionary.num_words
-
-    learning_rate_schedule = cfg['parameters']['lr_update_rate']
-    total_num_processed_tokens_in_training = epochs * num_tokens
-    num_processed_tokens = 0
-    local_processed_tokens = 0
-    N = len(train_data_loader.dataset)
-
-    learning_history = {
-        'train_loss': [],
-        'train_acc': [],
-        'val_loss': [],
-        'val_acc': [],
-        'test_loss': 0.,
-        'test_acc': 0.
-    }
-
-    test_loss_list = []
-    test_acc_list = []
-
-    is_stopped = False  # flag of early stopping
-    for epoch in range(1, epochs + 1):
-        # begin training phase
-        sum_loss = 0.
-        correct = 0
-        model.train()
-
-        for sentence, label, n_tokens in train_data_loader:
-            sentence, label = sentence.to(device), label.to(device)
-            optimizer.zero_grad()
-            output = model(sentence)
-            loss = F.nll_loss(output, label)
-            loss.backward()
-            optimizer.step()
-            pred = output.argmax(1, keepdim=False)
-            correct += pred.eq(label).sum().item()
-            sum_loss += loss.item()
-
-            # update learning rate
-            # ref: https://github.com/facebookresearch/fastText/blob/6d7c77cd33b23eec26198fdfe10419476b5364c7/src/fasttext.cc#L656
-            local_processed_tokens += n_tokens.item()
-            if local_processed_tokens > learning_rate_schedule:
-                num_processed_tokens += local_processed_tokens
-                local_processed_tokens = 0
-                progress = num_processed_tokens / total_num_processed_tokens_in_training
-                optimizer.param_groups[0]['lr'] = cfg['parameters']['lr'] * (1. - progress)
-
-        train_loss = sum_loss / N
-        train_acc = correct / N
-        # end training phase
-
-        # validation
-        val_loss, val_acc = evaluation(model, device, val_data_loader)
-
-        progress = num_processed_tokens / total_num_processed_tokens_in_training  # approximated progress
-        logger.info(
-            '\rProgress: {:.1f}% Avg. train loss: {:.4f}, train acc: {:.1f}%, '
-            'Avg. val loss: {:.4f}, val acc: {:.1f}%'.format(
-                progress * 100., train_loss, train_acc * 100, val_loss, val_acc * 100
-            )
-        )
-
-        # test
-        test_loss, test_acc = evaluation(model, device, test_data_loader)
-        test_loss_list.append(test_loss)
-        test_acc_list.append(test_acc)
-
-        # save this epoch
-        learning_history['train_loss'].append(train_loss)
-        learning_history['train_acc'].append(train_acc)
-        learning_history['val_loss'].append(val_loss)
-        learning_history['val_acc'].append(val_acc)
-
-        # check early stopping
-        if metric == 'loss':
-            is_stopped = early_stopping.is_stopped(val_loss)
-        else:
-            is_stopped = early_stopping.is_stopped(val_acc)
-
-        if is_stopped:
-            logger.info('Early stop!')
-            break
-
-    if is_stopped:
-        best_epoch_index = epoch - cfg['parameters']['patience'] - 1
-    else:
-        best_epoch_index = -1
-
-    # store test evaluation result
-    test_loss = test_loss_list[best_epoch_index]
-    test_acc = test_acc_list[best_epoch_index]
-    learning_history['test_loss'] = test_loss
-    learning_history['test_acc'] = test_acc
-
-    logger.info('\nTest loss: {:.4f}, test acc.: {:.1f}%'.format(
-        test_loss,
-        test_acc * 100
-    ))
+    sampler = TPESampler(seed=cfg['parameters']['seed'], n_startup_trials=2)
+    pruner = optuna.pruners.HyperbandPruner(max_resource=cfg['parameters']['epochs'])
+    study = optuna.create_study(direction=direction, sampler=sampler, pruner=pruner)
+    objective = Objective(cfg, logger)
+    study.optimize(objective, n_trials=cfg['optuna']['num_trials'], n_jobs=cfg['optuna']['n_jobs'])
 
     # logging_file
+    trial = study.best_trial
+
+    logger.info('\nVal. loss: {:.4f}, Val acc.: {:.1f}%'.format(
+        trial.user_attrs['val_loss'],
+        trial.user_attrs['val_acc'] * 100
+    ))
+
+    for key, value in trial.params.items():
+        logger.info('    {}: {}'.format(key, value))
+
+    # remove poor models
+    target = Path(trial.user_attrs['model_path'])
+    for path in target.parent.glob('*.pt'):
+        if path != target:
+            path.unlink()
+
+    # evaluation
+    # load test data loader
+    working_dir = utils.get_original_cwd() + '/'
+    test_set = SentenceDataset(
+        *objective.dictionary.transform(working_dir + cfg['dataset']['path'] + cfg['dataset']['test_fname']),
+        objective.dictionary.size_word_vocab,
+        train=False
+    )
+    test_data_loader = torch.utils.data.dataloader.DataLoader(
+        test_set,
+        batch_size=1,
+        shuffle=False,
+        num_workers=1
+    )
+
+    device = objective.device
+    # init model
+    model = SupervisedFastText(
+        V=objective.dictionary.size_total_vocab,
+        num_classes=len(objective.dictionary.label_vocab),
+        embedding_dim=objective.dim,
+        pretrained_emb=None,
+        freeze=True,
+        pooling=objective.pooling
+    ).to(device)
+
+    # load model
+    model.load_state_dict(torch.load(target, map_location=device))
+    model = model.to(device)
+
+    loss, acc = evaluation(model, device, test_data_loader, divide_by_num_data=True)
+    results = trial.user_attrs
+    results['test_loss'] = loss
+    results['test_acc'] = acc
+
     output_path_fname = os.getcwd() + '/' + cfg['parameters']['logging_file']
     logger.info('Saving training history and evaluation scores in {}'.format(output_path_fname))
     with open(output_path_fname, 'w') as log_file:
-        json.dump(learning_history, log_file)
+        json.dump(results, log_file)
 
 
 if __name__ == '__main__':

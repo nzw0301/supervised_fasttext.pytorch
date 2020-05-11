@@ -1,5 +1,25 @@
 import numpy as np
 
+_valid_initialised_methods = ['uniform', 'mean']
+
+
+def check_hydra_conf(cfg) -> None:
+    """
+    Validate the hydra's config parameters
+    :param cfg: Hydra's config instance.
+    :return: None
+    """
+    assert 0 < cfg['parameters']['dim']
+    assert 0 < cfg['parameters']['min_count']
+    assert 0 < cfg['parameters']['epochs']
+    assert 0. < cfg['parameters']['lr_update_rate']
+    assert 0 < cfg['parameters']['patience']
+    assert cfg['parameters']['metric'] in ['loss', 'acc']
+    assert cfg['parameters']['initialize_oov'] in _valid_initialised_methods
+    assert 0. < cfg['optuna']['lr_min']
+    assert cfg['optuna']['lr_min'] <= cfg['optuna']['lr_max']
+    assert cfg['optuna']['num_trials'] > 0
+
 
 class EarlyStopping(object):
     _valid_modes = ['min', 'max']
@@ -10,9 +30,9 @@ class EarlyStopping(object):
             min_delta=0.,
             patience=10
     ):
-        assert mode in self._valid_modes,\
+        assert mode in self._valid_modes, \
             'mode {} is not supported. You must pass one of [{}] to `mode`.'.format(mode, ', '.join(self._valid_modes))
-        assert patience > 0,\
+        assert patience > 0, \
             '`patient` must be positive.'
 
         self.mode = mode
